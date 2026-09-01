@@ -9,6 +9,8 @@ const MINUS = 45
 
 const DEV_NULL = '/dev/null'
 const GIT_HEADER = 'diff --git '
+/** How `git show` heads a file in a merge commit: one path, not two. */
+const COMBINED_HEADERS = ['diff --cc ', 'diff --combined ']
 const SUBMODULE_MODE = '160000'
 
 const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/
@@ -181,6 +183,18 @@ export function parseUnifiedDiff(source: string): ParsedDiff {
       continue
     }
 
+    const combinedHeader = COMBINED_HEADERS.find((prefix) => line.startsWith(prefix))
+    if (combinedHeader !== undefined) {
+      flush()
+      draft = createDraft()
+      draft.combined = true
+      const path = unquoteGitPath(line.slice(combinedHeader.length))
+      draft.headerOldPath = path
+      draft.headerNewPath = path
+      warnings.push({ line: lineNumber, message: 'combined (merge) diffs are not supported' })
+      continue
+    }
+
     if (line.startsWith('--- ')) {
       if (draft === null || draft.hunks.length > 0 || draft.markerOldPath !== undefined) {
         flush()
@@ -203,8 +217,10 @@ export function parseUnifiedDiff(source: string): ParsedDiff {
         continue
       }
       if (line.startsWith('@@@')) {
+        if (!draft.combined) {
+          warnings.push({ line: lineNumber, message: 'combined (merge) diffs are not supported' })
+        }
         draft.combined = true
-        warnings.push({ line: lineNumber, message: 'combined (merge) diffs are not supported' })
         continue
       }
       const header = HUNK_HEADER.exec(line)

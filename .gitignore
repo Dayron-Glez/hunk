@@ -27,4 +27,11 @@ test-results
 playwright-report
 blob-report
 
-.claude/settings.local.json
+.claude
+
+# Some editor extensions transpile TypeScript next to its source. Nothing in
+# src/ is authored as JavaScript, so anything that appears there is build junk.
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts
+!src/vite-env.d.ts
