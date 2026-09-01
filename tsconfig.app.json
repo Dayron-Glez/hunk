@@ -29,6 +29,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "bench/harness"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

@@ -35,3 +35,9 @@ src/**/*.js
 src/**/*.js.map
 src/**/*.d.ts
 !src/vite-env.d.ts
+
+bench/dist
+
+# The working output of a bench run. Named snapshots next to it are committed;
+# this one is overwritten every time and would only produce noisy diffs.
+bench/results/latest.json
