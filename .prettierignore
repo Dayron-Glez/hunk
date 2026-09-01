@@ -4,3 +4,6 @@ node_modules
 fixtures
 package-lock.json
 .claude
+
+# Written by the bench runner, not by hand.
+bench/results

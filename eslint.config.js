@@ -5,7 +5,7 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'node_modules', 'fixtures'] },
+  { ignores: ['dist', 'bench/dist', 'coverage', 'node_modules', 'fixtures'] },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -35,8 +35,14 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.js'],
+    files: ['**/*.js', '**/*.mjs'],
     extends: [js.configs.recommended, tseslint.configs.disableTypeChecked],
     languageOptions: { globals: globals.node },
+  },
+  {
+    // The benchmark runner is a Node script that also carries callbacks which
+    // Playwright evaluates inside the page, so both sets of globals are real here.
+    files: ['bench/**/*.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
 )
