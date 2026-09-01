@@ -57,6 +57,10 @@ Rare in the corpus, still fatal to a parser.
 | `single-line-hunk-header.diff` | `@@ -1 +1 @@` — the count omitted |
 | `many-hunks.diff` | Three hunks in one file |
 | `path-with-spaces.diff` | A path with a space, which git terminates with a **tab** on the `---`/`+++` lines |
+| `path-quoted-utf8.diff` | A non-ASCII path: git wraps it in quotes and escapes every byte in octal |
 
-That last one is the trap worth naming: `diff --git a/spaced name.txt b/spaced name.txt`
-cannot be split on whitespace, and the trailing tab on the `---` line is significant.
+The last two are the traps worth naming. `diff --git a/spaced name.txt b/spaced name.txt`
+cannot be split on whitespace, and the trailing tab on the `---` line is significant. And a
+non-ASCII path does not arrive as text at all — git writes
+`"a/cafÃ© â.txt"`, quoted, with every non-ASCII byte escaped in octal, so
+the path has to be unescaped back into bytes and decoded before anything can display it.
