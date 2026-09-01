@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📊 The performance targets
+    url: https://github.com/Dayron-Glez/hunk#the-goal-stated-as-a-number
+    about: The numbers hunk is built to hit, before you file a performance issue.
+  - name: 🧪 How the fixture corpus works
+    url: https://github.com/Dayron-Glez/hunk/blob/main/fixtures/README.md
+    about: Where the test diffs come from and how to add one.
