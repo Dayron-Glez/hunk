@@ -1,0 +1,11 @@
+file	source	sha	covers
+vite-pr-23346-normal.diff	vitejs/vite#23346	pull/23346	normal PR: source + test, 2 files
+vite-pr-23378-new-files.diff	vitejs/vite#23378	pull/23378	medium PR with added files, 10 files
+prettier-bb52ae36-rename.diff	prettier/prettier	bb52ae36d5	rename (similarity 100%), new files, one-line hunk header
+github-docs-90ce4889-binary-add.diff	github/docs	90ce4889da	added binary file alongside a text change
+github-docs-5dc99214-binary-delete.diff	github/docs	5dc992146e	deleted binary file, no hunks at all
+git-86cfd61e-submodule-add.diff	git/git	86cfd61e6b	submodule added (mode 160000) plus .gitmodules
+git-4125f782-submodule-bump.diff	git/git	4125f78222	submodule pointer bump
+npm-cli-47fc8b19-mass-rename.diff	npm/cli	47fc8b191a	168 files, mass renames, dependency tree churn
+npm-cli-75a943de-minified-bundle.diff	npm/cli	75a943ded9	regenerated lockfile + minified bundles: 174 lines, 380 KB
+linux-93e4b307-huge.diff	torvalds/linux	93e4b3076b	758 files, 2.1 MB

@@ -1,4 +1,7 @@
 * text=auto eol=lf
 
-fixtures/** -text -diff
-package-lock.json -diff
+# The corpus is bytes, not text: normalizing a line ending here would silently
+# destroy crlf.diff and every checksum in it.
+fixtures/** -text
+
+package-lock.json linguist-generated=true

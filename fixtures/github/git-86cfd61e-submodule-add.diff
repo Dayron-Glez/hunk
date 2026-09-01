@@ -1,0 +1,65 @@
+diff --git a/.gitmodules b/.gitmodules
+new file mode 100644
+index 00000000000000..cbeebdab7a5e2c
+--- /dev/null
++++ b/.gitmodules
+@@ -0,0 +1,4 @@
++[submodule "sha1collisiondetection"]
++	path = sha1collisiondetection
++	url = https://github.com/cr-marcstevens/sha1collisiondetection.git
++	branch = master
+diff --git a/Makefile b/Makefile
+index ffa6da71b7ccae..6baad1669e0e76 100644
+--- a/Makefile
++++ b/Makefile
+@@ -144,6 +144,12 @@ all::
+ # algorithm. This is slower, but may detect attempted collision attacks.
+ # Takes priority over other *_SHA1 knobs.
+ #
++# Define DC_SHA1_SUBMODULE in addition to DC_SHA1 to use the
++# sha1collisiondetection shipped as a submodule instead of the
++# non-submodule copy in sha1dc/. This is an experimental option used
++# by the git project to migrate to using sha1collisiondetection as a
++# submodule.
++#
+ # Define OPENSSL_SHA1 environment variable when running make to link
+ # with the SHA1 routine from openssl library.
+ #
+@@ -1412,8 +1418,14 @@ ifdef APPLE_COMMON_CRYPTO
+ 	BASIC_CFLAGS += -DSHA1_APPLE
+ else
+ 	DC_SHA1 := YesPlease
++ifdef DC_SHA1_SUBMODULE
++	LIB_OBJS += sha1collisiondetection/lib/sha1.o
++	LIB_OBJS += sha1collisiondetection/lib/ubc_check.o
++	BASIC_CFLAGS += -DDC_SHA1_SUBMODULE
++else
+ 	LIB_OBJS += sha1dc/sha1.o
+ 	LIB_OBJS += sha1dc/ubc_check.o
++endif
+ 	BASIC_CFLAGS += \
+ 		-DSHA1_DC \
+ 		-DSHA1DC_NO_STANDARD_INCLUDES \
+diff --git a/hash.h b/hash.h
+index a11fc9233fc9bb..bef3e630a093b5 100644
+--- a/hash.h
++++ b/hash.h
+@@ -8,7 +8,11 @@
+ #elif defined(SHA1_OPENSSL)
+ #include <openssl/sha.h>
+ #elif defined(SHA1_DC)
++#ifdef DC_SHA1_SUBMODULE
++#include "sha1collisiondetection/lib/sha1.h"
++#else
+ #include "sha1dc/sha1.h"
++#endif
+ #else /* SHA1_BLK */
+ #include "block-sha1/sha1.h"
+ #endif
+diff --git a/sha1collisiondetection b/sha1collisiondetection
+new file mode 160000
+index 00000000000000..19d97bf5af0531
+--- /dev/null
++++ b/sha1collisiondetection
+@@ -0,0 +1 @@
++Subproject commit 19d97bf5af05312267c2e874ee6bcf584d9e9681

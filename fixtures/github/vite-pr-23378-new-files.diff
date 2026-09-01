@@ -1,0 +1,271 @@
+diff --git a/.gitignore b/.gitignore
+index e5390bb32f579f..eb6ae07f5f9705 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -15,6 +15,8 @@ node_modules
+ !**/glob-import/root/dir/node_modules
+ !**/fixtures/glob-exports/node_modules
+ !**/fixtures/glob-exports/node_modules/my-pkg/dist
++!**/fixtures/config/native-compat/json-named-import-bare/node_modules
++!**/fixtures/config/native-compat/json-named-import-ok/node_modules
+ playground-temp
+ temp
+ TODOs.md
+diff --git a/packages/vite/src/node/__tests__/config.spec.ts b/packages/vite/src/node/__tests__/config.spec.ts
+index 589602dc0df54d..58fdeeedf5bef2 100644
+--- a/packages/vite/src/node/__tests__/config.spec.ts
++++ b/packages/vite/src/node/__tests__/config.spec.ts
+@@ -1728,6 +1728,32 @@ describe('loadConfigFromFile', () => {
+       expect(await loadWithWarnings('json-ok')).toHaveLength(0)
+     })
+ 
++    test('warns on named import from JSON module', async () => {
++      const messages = await loadWithWarnings('json-named-import')
++      expect(messages).toMatchInlineSnapshot(`
++        [
++          "(!) Your Vite config uses features that are unsupported by \`configLoader: 'native'\`, which is planned to become the default in a future major version of Vite:
++          - named import from JSON module "./data.json" (vite.config.js:1:10). JSON modules only provide a default export per spec. Use the default import and access the property
++        Set \`VITE_CONFIG_NATIVE_IGNORE_WARNING=true\` to suppress this warning.",
++        ]
++      `)
++    })
++
++    test('warns on named import from a bare JSON specifier', async () => {
++      const messages = await loadWithWarnings('json-named-import-bare')
++      expect(messages).toMatchInlineSnapshot(`
++        [
++          "(!) Your Vite config uses features that are unsupported by \`configLoader: 'native'\`, which is planned to become the default in a future major version of Vite:
++          - named import from JSON module "some-pkg/package.json" (vite.config.js:1:10). JSON modules only provide a default export per spec. Use the default import and access the property
++        Set \`VITE_CONFIG_NATIVE_IGNORE_WARNING=true\` to suppress this warning.",
++        ]
++      `)
++    })
++
++    test('does not warn on JSON default imports (`default as` included)', async () => {
++      expect(await loadWithWarnings('json-named-import-ok')).toHaveLength(0)
++    })
++
+     test('warns on an extension-less import that resolves to JSON', async () => {
+       const messages = await loadWithWarnings('json-extensionless')
+       expect(messages).toMatchInlineSnapshot(`
+diff --git a/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-bare/node_modules/some-pkg/package.json b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-bare/node_modules/some-pkg/package.json
+new file mode 100644
+index 00000000000000..16b2018255024a
+--- /dev/null
++++ b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-bare/node_modules/some-pkg/package.json
+@@ -0,0 +1,4 @@
++{
++  "name": "some-pkg",
++  "version": "1.0.0"
++}
+diff --git a/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-bare/vite.config.js b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-bare/vite.config.js
+new file mode 100644
+index 00000000000000..78537a5a64beec
+--- /dev/null
++++ b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-bare/vite.config.js
+@@ -0,0 +1,3 @@
++import { version } from 'some-pkg/package.json' with { type: 'json' }
++
++export default { define: { VERSION: JSON.stringify(version) } }
+diff --git a/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-ok/data.json b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-ok/data.json
+new file mode 100644
+index 00000000000000..012d571881352f
+--- /dev/null
++++ b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-ok/data.json
+@@ -0,0 +1 @@
++{ "version": "1.0.0" }
+diff --git a/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-ok/node_modules/some-pkg/package.json b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-ok/node_modules/some-pkg/package.json
+new file mode 100644
+index 00000000000000..16b2018255024a
+--- /dev/null
++++ b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-ok/node_modules/some-pkg/package.json
+@@ -0,0 +1,4 @@
++{
++  "name": "some-pkg",
++  "version": "1.0.0"
++}
+diff --git a/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-ok/vite.config.js b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-ok/vite.config.js
+new file mode 100644
+index 00000000000000..98db49c38132e4
+--- /dev/null
++++ b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import-ok/vite.config.js
+@@ -0,0 +1,8 @@
++import somePkg from 'some-pkg/package.json' with { type: 'json' }
++import data, { default as dataAlias } from './data.json' with { type: 'json' }
++
++export default {
++  define: {
++    VERSION: JSON.stringify(data.version + dataAlias.version + somePkg.version),
++  },
++}
+diff --git a/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import/data.json b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import/data.json
+new file mode 100644
+index 00000000000000..012d571881352f
+--- /dev/null
++++ b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import/data.json
+@@ -0,0 +1 @@
++{ "version": "1.0.0" }
+diff --git a/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import/vite.config.js b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import/vite.config.js
+new file mode 100644
+index 00000000000000..e4906dc1c1d03b
+--- /dev/null
++++ b/packages/vite/src/node/__tests__/fixtures/config/native-compat/json-named-import/vite.config.js
+@@ -0,0 +1,3 @@
++import { version } from './data.json' with { type: 'json' }
++
++export default { define: { VERSION: JSON.stringify(version) } }
+diff --git a/packages/vite/src/node/nativeConfigCompat.ts b/packages/vite/src/node/nativeConfigCompat.ts
+index 744968a0bbbd37..0bbef4afbabbaf 100644
+--- a/packages/vite/src/node/nativeConfigCompat.ts
++++ b/packages/vite/src/node/nativeConfigCompat.ts
+@@ -12,6 +12,7 @@ export type NativeConfigIncompatibilityType =
+   | 'extensionless-import'
+   | 'directory-index-import'
+   | 'json-without-attributes'
++  | 'json-named-import'
+   | 'esm-syntax-in-cjs'
+ 
+ export interface NativeConfigIncompatibility {
+@@ -31,6 +32,8 @@ export interface ConfigImportRef {
+   line: number
+   column: number
+   hasTypeJsonAttribute: boolean
++  /** position of the first non-default named binding */
++  namedImportLoc?: { line: number; column: number }
+ }
+ 
+ const jsTsExtRE = /\.[cm]?[jt]sx?$/
+@@ -56,14 +59,36 @@ export function classifyImportRef(
+   const base = { file, line, column, specifier }
+ 
+   if (specifier.endsWith('.json')) {
+-    if (ref.hasTypeJsonAttribute) return undefined
+-    return { type: 'json-without-attributes', ...base }
++    if (!ref.hasTypeJsonAttribute) {
++      return { type: 'json-without-attributes', ...base }
++    }
++    if (ref.namedImportLoc) {
++      return {
++        type: 'json-named-import',
++        file,
++        line: ref.namedImportLoc.line,
++        column: ref.namedImportLoc.column,
++        specifier,
++      }
++    }
++    return undefined
+   }
+ 
+   if (!resolvedId) return undefined
+ 
+-  if (resolvedId.endsWith('.json') && !ref.hasTypeJsonAttribute) {
+-    return { type: 'json-without-attributes', ...base }
++  if (resolvedId.endsWith('.json')) {
++    if (!ref.hasTypeJsonAttribute) {
++      return { type: 'json-without-attributes', ...base }
++    }
++    if (ref.namedImportLoc) {
++      return {
++        type: 'json-named-import',
++        file,
++        line: ref.namedImportLoc.line,
++        column: ref.namedImportLoc.column,
++        specifier,
++      }
++    }
+   }
+ 
+   const lastSegment = lastSegmentOf(specifier)
+@@ -89,6 +114,24 @@ const hasTypeJson = (
+     return key === 'type' && attr.value?.value === 'json'
+   })
+ 
++const findNonDefaultNamedBinding = (
++  specifiers: ESTree.Node[],
++): ESTree.Node | undefined =>
++  specifiers.find((s) => {
++    if (s.type === 'ImportSpecifier') {
++      return !isDefaultModuleExportName(s.imported)
++    }
++    if (s.type === 'ExportSpecifier') {
++      return !isDefaultModuleExportName(s.local)
++    }
++    return false
++  })
++
++const isDefaultModuleExportName = (node: ESTree.ModuleExportName): boolean =>
++  node.type === 'Identifier'
++    ? node.name === 'default'
++    : node.value === 'default'
++
+ const DIRNAME_FILENAME = {
+   __dirname: 'dirname',
+   __filename: 'filename',
+@@ -104,14 +147,23 @@ export function analyzeConfigModuleReferences(
+   const addImportRef = (
+     source: ESTree.StringLiteral,
+     hasTypeJsonAttribute: boolean,
++    namedBinding: ESTree.Node | undefined,
+   ): void => {
+-    if (!isPathSpecifier(source.value)) return
++    // bare specifiers are skipped except for the JSON checks, which classify
++    // from the specifier alone (`vue/package.json` etc.)
++    if (!isPathSpecifier(source.value) && !source.value.endsWith('.json')) {
++      return
++    }
+     const { line, column } = numberToPos(code, source.start)
++    const namedImportLoc = namedBinding
++      ? numberToPos(code, namedBinding.start)
++      : undefined
+     imports.push({
+       specifier: source.value,
+       line,
+       column,
+       hasTypeJsonAttribute,
++      namedImportLoc,
+     })
+   }
+ 
+@@ -120,12 +172,22 @@ export function analyzeConfigModuleReferences(
+       const node = _node as ESTree.Node
+       switch (node.type) {
+         case 'ImportDeclaration':
+-          addImportRef(node.source, hasTypeJson(node.attributes))
++          addImportRef(
++            node.source,
++            hasTypeJson(node.attributes),
++            findNonDefaultNamedBinding(node.specifiers),
++          )
+           break
+         case 'ExportNamedDeclaration':
+         case 'ExportAllDeclaration':
+           if (node.source)
+-            addImportRef(node.source, hasTypeJson(node.attributes))
++            addImportRef(
++              node.source,
++              hasTypeJson(node.attributes),
++              node.type === 'ExportNamedDeclaration'
++                ? findNonDefaultNamedBinding(node.specifiers)
++                : undefined,
++            )
+           break
+         case 'ImportExpression':
+           if (
+@@ -133,7 +195,7 @@ export function analyzeConfigModuleReferences(
+             typeof node.source.value === 'string'
+           ) {
+             // if a second (options) arg is present, assume the required attributes is set
+-            addImportRef(node.source, node.options != null)
++            addImportRef(node.source, node.options != null, undefined)
+           }
+           break
+       }
+@@ -194,6 +256,8 @@ function describeIncompatibility(
+       return item.specifier?.endsWith('.json')
+         ? `JSON import "${item.specifier}" without import attributes (${loc}). Add \`with { type: 'json' }\``
+         : `import "${item.specifier}" resolves to a JSON file (${loc}). Import it with a \`.json\` extension and \`with { type: 'json' }\``
++    case 'json-named-import':
++      return `named import from JSON module "${item.specifier}" (${loc}). JSON modules only provide a default export per spec. Use the default import and access the property`
+     case 'esm-syntax-in-cjs':
+       return `ESM syntax in a file loaded as CommonJS (${loc}). Use a \`.mjs\` extension or set \`"type": "module"\` in the closest package.json`
+   }

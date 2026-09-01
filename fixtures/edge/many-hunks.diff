@@ -1,0 +1,29 @@
+diff --git a/wide.txt b/wide.txt
+index fcd8734..0055c9c 100644
+--- a/wide.txt
++++ b/wide.txt
+@@ -1,6 +1,6 @@
+ 1
+ 2
+-3
++three
+ 4
+ 5
+ 6
+@@ -27,7 +27,7 @@
+ 27
+ 28
+ 29
+-30
++thirty
+ 31
+ 32
+ 33
+@@ -55,6 +55,6 @@
+ 55
+ 56
+ 57
+-58
++fifty-eight
+ 59
+ 60

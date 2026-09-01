@@ -1,0 +1,217 @@
+diff --git a/cspell.json b/cspell.json
+index 258e9f71ed1f..5fff0c8a14dd 100644
+--- a/cspell.json
++++ b/cspell.json
+@@ -282,6 +282,7 @@
+         "unaries",
+         "uncook",
+         "unparenthesised",
++        "unsyntactic",
+         "upvotes",
+         "valourous",
+         "Vanderwerff",
+diff --git a/src/language-js/parse/babel.js b/src/language-js/parse/babel.js
+index fc8c041246db..2861305db530 100644
+--- a/src/language-js/parse/babel.js
++++ b/src/language-js/parse/babel.js
+@@ -198,6 +198,7 @@ const allowedReasonCodesArray = [
+   "StrictEvalArgumentsBinding",
+   "StrictFunction",
+   "ForInOfLoopInitializer",
++  "IllegalBreakContinue",
+ 
+   "ParamDupe",
+   "RestTrailingComma",
+diff --git a/tests/format/js/label/__snapshots__/format.test.js.snap b/tests/format/js/label/__snapshots__/format.test.js.snap
+index ccebe25d5137..61bf8724b064 100644
+--- a/tests/format/js/label/__snapshots__/format.test.js.snap
++++ b/tests/format/js/label/__snapshots__/format.test.js.snap
+@@ -44,7 +44,7 @@ parsers: ["babel", "flow", "typescript"]
+ ================================================================================
+ `;
+ 
+-exports[`empty_label.js format 1`] = `
++exports[`empty-label.js format 1`] = `
+ ====================================options=====================================
+ parsers: ["babel", "flow", "typescript"]
+                                                       printWidth: 80 (default) |
+@@ -66,3 +66,138 @@ a /* comment */:;
+ 
+ ================================================================================
+ `;
++
++exports[`invalid-undefined-label.js format 1`] = `
++====================================options=====================================
++parsers: ["babel", "flow", "typescript"]
++                                                      printWidth: 80 (default) |
++=====================================input======================================
++for ( ;; ) {
++  continue foo;
++}
++
++=====================================output=====================================
++for (;;) {
++  continue foo;
++}
++
++================================================================================
++`;
++
++exports[`invalid-undefined-label.js format[acorn] 1`] = `
++"Unsyntactic continue (2:3)
++  1 | for ( ;; ) {
++> 2 |   continue foo;
++    |   ^
++  3 | }
++  4 |
++Cause: Unsyntactic continue (2:2)"
++`;
++
++exports[`invalid-undefined-label.js format[espree] 1`] = `
++"Unsyntactic continue (2:3)
++  1 | for ( ;; ) {
++> 2 |   continue foo;
++    |   ^
++  3 | }
++  4 |
++Cause: Unsyntactic continue"
++`;
++
++exports[`invalid-undefined-label.js format[flow] 1`] = `
++"Undefined label 'foo' (2:12)
++  1 | for ( ;; ) {
++> 2 |   continue foo;
++    |            ^
++  3 | }
++  4 |
++Cause: Undefined label 'foo' (2:11)"
++`;
++
++exports[`invalid-undefined-label.js format[hermes] 1`] = `
++"label 'foo' is not defined (2:12)
++  1 | for ( ;; ) {
++> 2 |   continue foo;
++    |            ^
++  3 | }
++  4 |
++Cause: label 'foo' is not defined (2:11)
++  continue foo;
++           ^~~"
++`;
++
++exports[`invalid-undefined-label.js format[meriyah] 1`] = `
++"Undefined label 'foo' (2:15)
++  1 | for ( ;; ) {
++> 2 |   continue foo;
++    |               ^
++  3 | }
++  4 |
++Cause: [2:14-2:15]: Undefined label 'foo'"
++`;
++
++exports[`invalid-unsyntactic-continue.js format 1`] = `
++====================================options=====================================
++parsers: ["babel", "flow", "typescript"]
++                                                      printWidth: 80 (default) |
++=====================================input======================================
++// https://github.com/tc39/test262/blob/d86b2294eb0a17eaa281ff12c73c473ec864c72f/test/language/statements/block/labeled-continue.js#L20-L24
++
++label: {
++  for ( ;; ) {
++    continue label;
++  }
++}
++
++=====================================output=====================================
++// https://github.com/tc39/test262/blob/d86b2294eb0a17eaa281ff12c73c473ec864c72f/test/language/statements/block/labeled-continue.js#L20-L24
++
++label: {
++  for (;;) {
++    continue label;
++  }
++}
++
++================================================================================
++`;
++
++exports[`invalid-unsyntactic-continue.js format[acorn] 1`] = `
++"Unsyntactic continue (5:5)
++  3 | label: {
++  4 |   for ( ;; ) {
++> 5 |     continue label;
++    |     ^
++  6 |   }
++  7 | }
++  8 |
++Cause: Unsyntactic continue (5:4)"
++`;
++
++exports[`invalid-unsyntactic-continue.js format[espree] 1`] = `
++"Unsyntactic continue (5:5)
++  3 | label: {
++  4 |   for ( ;; ) {
++> 5 |     continue label;
++    |     ^
++  6 |   }
++  7 | }
++  8 |
++Cause: Unsyntactic continue"
++`;
++
++exports[`invalid-unsyntactic-continue.js format[hermes] 1`] = `
++"'continue' label 'label' is not a loop label (5:14)
++  3 | label: {
++  4 |   for ( ;; ) {
++> 5 |     continue label;
++    |              ^
++  6 |   }
++  7 | }
++  8 |
++Cause: 'continue' label 'label' is not a loop label (5:13)
++    continue label;
++             ^~~~~
++note: label defined here (3:0)
++label: {
++^~~~~"
++`;
+diff --git a/tests/format/js/label/empty_label.js b/tests/format/js/label/empty-label.js
+similarity index 100%
+rename from tests/format/js/label/empty_label.js
+rename to tests/format/js/label/empty-label.js
+diff --git a/tests/format/js/label/format.test.js b/tests/format/js/label/format.test.js
+index 67c251cced19..d168fd68f63d 100644
+--- a/tests/format/js/label/format.test.js
++++ b/tests/format/js/label/format.test.js
+@@ -1 +1,9 @@
+-runFormatTest(import.meta, ["babel", "flow", "typescript"]);
++runFormatTest(import.meta, ["babel", "flow", "typescript"], {
++  errors: {
++    flow: ["invalid-undefined-label.js"],
++    acorn: ["invalid-undefined-label.js", "invalid-unsyntactic-continue.js"],
++    espree: ["invalid-undefined-label.js", "invalid-unsyntactic-continue.js"],
++    meriyah: ["invalid-undefined-label.js"],
++    hermes: ["invalid-undefined-label.js", "invalid-unsyntactic-continue.js"],
++  },
++});
+diff --git a/tests/format/js/label/invalid-undefined-label.js b/tests/format/js/label/invalid-undefined-label.js
+new file mode 100644
+index 000000000000..c6ceadd0dc06
+--- /dev/null
++++ b/tests/format/js/label/invalid-undefined-label.js
+@@ -0,0 +1,3 @@
++for ( ;; ) {
++  continue foo;
++}
+diff --git a/tests/format/js/label/invalid-unsyntactic-continue.js b/tests/format/js/label/invalid-unsyntactic-continue.js
+new file mode 100644
+index 000000000000..ef137817009b
+--- /dev/null
++++ b/tests/format/js/label/invalid-unsyntactic-continue.js
+@@ -0,0 +1,7 @@
++// https://github.com/tc39/test262/blob/d86b2294eb0a17eaa281ff12c73c473ec864c72f/test/language/statements/block/labeled-continue.js#L20-L24
++
++label: {
++  for ( ;; ) {
++    continue label;
++  }
++}

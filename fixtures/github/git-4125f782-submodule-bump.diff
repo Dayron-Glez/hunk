@@ -1,0 +1,20 @@
+diff --git a/sha1collisiondetection b/sha1collisiondetection
+index 16033998da4b27..855827c583bc30 160000
+--- a/sha1collisiondetection
++++ b/sha1collisiondetection
+@@ -1 +1 @@
+-Subproject commit 16033998da4b273aebd92c84b1e1b12e4aaf7009
++Subproject commit 855827c583bc30645ba427885caa40c5b81764d2
+diff --git a/sha1dc/sha1.c b/sha1dc/sha1.c
+index 5931cf25d518ac..9d3cf81d4d712f 100644
+--- a/sha1dc/sha1.c
++++ b/sha1dc/sha1.c
+@@ -93,7 +93,7 @@
+ #define SHA1DC_BIGENDIAN
+ 
+ /* Not under GCC-alike or glibc or *BSD or newlib or <processor whitelist> */
+-#elif (defined(_AIX))
++#elif (defined(_AIX) || defined(__hpux))
+ 
+ /*
+  * Defines Big Endian on a whitelist of OSs that are known to be Big
