@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFixture } from '../../../tests/fixtures'
 import { parseUnifiedDiff } from '../parse/unified'
+import { GRAMMARS } from '../../workers/grammars'
 import { SUPPORTED_LANGUAGES, languageOf } from './language'
 
 describe('by extension', () => {
@@ -77,5 +78,24 @@ describe('against the corpus', () => {
     const diff = parseUnifiedDiff(readFixture('github', 'github-docs-90ce4889-binary-add.diff'))
     const binary = diff.files.find((file) => file.binary)
     expect(languageOf(binary?.newPath ?? null)).toBeNull()
+  })
+})
+
+/**
+ * Two lists that must not drift: one decides what to ask for, the other decides
+ * what can be loaded. A language in the first and missing from the second is a
+ * file that silently renders plain.
+ */
+describe('the grammar map agrees with the language map', () => {
+  it('can load every language the detector can name', () => {
+    for (const lang of SUPPORTED_LANGUAGES) {
+      expect(Object.keys(GRAMMARS)).toContain(lang)
+    }
+  })
+
+  it('carries no grammar nothing will ever ask for', () => {
+    for (const lang of Object.keys(GRAMMARS)) {
+      expect(SUPPORTED_LANGUAGES).toContain(lang)
+    }
   })
 })
