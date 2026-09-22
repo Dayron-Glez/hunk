@@ -25,6 +25,7 @@ const ESTIMATED_HEIGHT: Record<RowKind, number> = {
   [RowKind.Note]: 52,
   [RowKind.HunkHeader]: 24,
   [RowKind.Line]: 20,
+  [RowKind.Gap]: 29,
 }
 
 /** Rendered beyond the viewport, so small scrolls need no new rows. */

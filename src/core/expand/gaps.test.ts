@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFixture } from '../../../tests/fixtures'
 import { parseUnifiedDiff } from '../parse/unified'
 import type { DiffFile, Hunk } from '../parse/types'
-import { expandGap, gapsIn, sizeOf } from './gaps'
+import { expandGap, fileMatchesDiff, gapsIn, sizeOf } from './gaps'
 
 /** A file of numbered lines, so a revealed line says where it came from. */
 const source = (count: number): string[] => Array.from({ length: count }, (_, i) => `line ${i + 1}`)
@@ -312,5 +312,49 @@ describe.each([
       expect(after.hunks.reduce((n, h) => n + h.lines.length, 0)).toBe(before + size)
       return
     }
+  })
+})
+
+/**
+ * The file is fetched at the pull request's head rather than at a pinned
+ * commit — one API call instead of two, and no fork to resolve. A push
+ * between loading the diff and opening a gap would hand back a file the
+ * numbers no longer fit, so the lines the diff already carries are what
+ * decides whether it is still the right file.
+ */
+describe('refusing a file that has moved on', () => {
+  const file = fileOf(hunk(3, 3, ' + '))
+
+  const fileAt = (...lines: string[]): string[] => lines
+
+  it('accepts the file the diff was made against', () => {
+    // The hunk holds context at 3 and 5, and an insertion at 4.
+    const source = fileAt('line 1', 'line 2', 'line 3', 'added', 'line 5')
+    expect(fileMatchesDiff(file, source)).toBe(true)
+  })
+
+  it('refuses one where a line has changed underneath', () => {
+    const source = fileAt('line 1', 'line 2', 'line 3', 'added', 'something else')
+    expect(fileMatchesDiff(file, source)).toBe(false)
+  })
+
+  it('refuses one where the lines have shifted', () => {
+    const source = fileAt('new', 'line 1', 'line 2', 'line 3', 'added', 'line 5')
+    expect(fileMatchesDiff(file, source)).toBe(false)
+  })
+
+  it('refuses one that is too short to hold them', () => {
+    expect(fileMatchesDiff(file, fileAt('line 1', 'line 2'))).toBe(false)
+  })
+
+  it('judges on the new side only, since that is what was fetched', () => {
+    // Context at new 3, a removal with no new number at all, then context at
+    // new 4 — the removed line is skipped and the numbering closes over it.
+    const removals = fileOf(hunk(3, 3, ' - '))
+    expect(fileMatchesDiff(removals, fileAt('a', 'b', 'line 3', 'line 4'))).toBe(true)
+  })
+
+  it('has nothing to disagree with in a file of no hunks', () => {
+    expect(fileMatchesDiff(fileOf(), [])).toBe(true)
   })
 })

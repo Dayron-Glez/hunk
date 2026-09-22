@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { BlobStore, splitLines, type DiffOrigin } from './blobs'
+import { BlobStore, pullRequestRef, splitLines, type DiffOrigin } from './blobs'
 
-const ORIGIN: DiffOrigin = { owner: 'vitejs', repo: 'vite', sha: 'abc123' }
+const ORIGIN: DiffOrigin = { owner: 'vitejs', repo: 'vite', ref: 'refs/pull/23346/head' }
 
 const NEWLINE = String.fromCharCode(10)
 const RETURN = String.fromCharCode(13)
@@ -17,11 +17,19 @@ const serving = (body: string, status = 200): { fetch: typeof fetch; calls: stri
   }
 }
 
+describe('what to fetch at', () => {
+  /** One API call per pull request instead of two, and no fork to resolve:
+   *  this ref points at the head from inside the base repository. */
+  it('names the pull request head rather than a commit', () => {
+    expect(pullRequestRef(23346)).toBe('refs/pull/23346/head')
+  })
+})
+
 describe('where a file is fetched from', () => {
   it('asks raw.githubusercontent at the commit the diff is of', () => {
     const store = new BlobStore(ORIGIN, serving('').fetch)
     expect(store.urlFor('src/a.ts')).toBe(
-      'https://raw.githubusercontent.com/vitejs/vite/abc123/src/a.ts',
+      'https://raw.githubusercontent.com/vitejs/vite/refs/pull/23346/head/src/a.ts',
     )
   })
 
@@ -35,7 +43,7 @@ describe('where a file is fetched from', () => {
   it('escapes each path segment without escaping the slashes', () => {
     const store = new BlobStore(ORIGIN, serving('').fetch)
     expect(store.urlFor('src/my folder/a b.ts')).toBe(
-      'https://raw.githubusercontent.com/vitejs/vite/abc123/src/my%20folder/a%20b.ts',
+      'https://raw.githubusercontent.com/vitejs/vite/refs/pull/23346/head/src/my%20folder/a%20b.ts',
     )
   })
 

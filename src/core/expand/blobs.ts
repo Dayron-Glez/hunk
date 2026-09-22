@@ -1,10 +1,22 @@
 /** Where the diff came from, and therefore where its files can be fetched. */
 export interface DiffOrigin {
-  /** The repository the head commit lives in — a fork, for most pull requests. */
   readonly owner: string
   readonly repo: string
-  /** The head commit, which is the revision the new side of the diff is at. */
-  readonly sha: string
+  /**
+   * What to fetch the files at. `refs/pull/123/head` for a pull request: it
+   * resolves in the base repository however far the branch lives from it, so
+   * the fork most pull requests come from never has to be looked up, and the
+   * metadata call that would find it is never made.
+   *
+   * It follows the pull request rather than pinning a commit, so a file may
+   * arrive newer than the diff. `fileMatchesDiff` is what refuses that.
+   */
+  readonly ref: string
+}
+
+/** The ref that resolves to a pull request's head in the base repository. */
+export function pullRequestRef(number: number): string {
+  return `refs/pull/${number}/head`
 }
 
 export type BlobResult =
@@ -41,9 +53,9 @@ export class BlobStore {
 
   /** The URL a path resolves to, so a test can say what was asked for. */
   urlFor(path: string): string {
-    const { owner, repo, sha } = this.origin
+    const { owner, repo, ref } = this.origin
     const encoded = path.split('/').map(encodeURIComponent).join('/')
-    return `https://raw.githubusercontent.com/${owner}/${repo}/${sha}/${encoded}`
+    return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${encoded}`
   }
 
   /** The file, split into lines. Asked for once however often it is wanted. */

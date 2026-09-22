@@ -10,6 +10,7 @@ const ESTIMATES: Record<Kind, number> = {
   [RowKind.Note]: 52,
   [RowKind.HunkHeader]: 24,
   [RowKind.Line]: 20,
+  [RowKind.Gap]: 29,
 }
 
 const load = (name: string): RowIndex => new RowIndex(parseUnifiedDiff(readFixture('github', name)))

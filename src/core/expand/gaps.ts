@@ -93,6 +93,31 @@ export function gapsIn(file: DiffFile, newFileLines: number | null = null): Gap[
   return gaps
 }
 
+/**
+ * Whether a fetched file is the one this diff was made against.
+ *
+ * The file is fetched at `refs/pull/N/head`, which follows the pull request
+ * rather than pinning a commit — one API call instead of two, and no fork to
+ * resolve. The cost is that a push between loading the diff and opening a gap
+ * would hand back a file the numbers no longer fit, and the revealed lines
+ * would be quietly wrong.
+ *
+ * So they are checked. Every line the diff already carries for the new side
+ * says what it should find at its own number; if the file disagrees anywhere,
+ * it has moved and nothing is revealed from it.
+ */
+export function fileMatchesDiff(file: DiffFile, source: readonly string[]): boolean {
+  for (const hunk of file.hunks) {
+    for (const line of hunk.lines) {
+      if (line.newNumber === null) continue
+      // A line marked as having no trailing newline can differ harmlessly.
+      if (line.noNewlineAtEof) continue
+      if (source[line.newNumber - 1] !== line.content) return false
+    }
+  }
+  return true
+}
+
 /** Which end of a gap to open, named by the hunk the lines join. */
 export type Direction = 'up' | 'down' | 'all'
 
