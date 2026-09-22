@@ -82,6 +82,12 @@ export function NoteRow({ file }: { readonly file: DiffFile }) {
  * from it is worse than one that needs aiming at. The label says what it
  * folds, because "collapse" repeated eight hundred times down a kernel commit
  * tells a screen reader nothing.
+ *
+ * Out of the tab order on purpose. Only the rows on screen exist, so tabbing
+ * would walk a list that rearranges itself under the reader as it scrolls,
+ * and its length would depend on the viewport. The grid is one tab stop and
+ * Enter on the focused row does this, which is the pattern a grid is supposed
+ * to follow anyway.
  */
 function Chevron({
   collapsed,
@@ -95,10 +101,11 @@ function Chevron({
   return (
     <button
       type="button"
+      tabIndex={-1}
       onClick={onToggle}
       aria-expanded={!collapsed}
       aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
-      className="shrink-0 rounded px-1 text-neutral-500 hover:bg-neutral-700/50 hover:text-neutral-200"
+      className="shrink-0 rounded px-1 text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-200"
     >
       <span aria-hidden className="inline-block w-3 text-center">
         {collapsed ? '›' : '⌄'}
@@ -134,6 +141,7 @@ export function ExpanderRow({
     >
       <button
         type="button"
+        tabIndex={-1}
         onClick={onExpand}
         className="rounded border border-neutral-700 px-2 py-0.5 text-neutral-300 hover:bg-neutral-700/50"
       >
@@ -142,13 +150,14 @@ export function ExpanderRow({
       {hidden > next ? (
         <button
           type="button"
+          tabIndex={-1}
           onClick={onExpandAll}
-          className="rounded px-2 py-0.5 text-neutral-500 hover:text-neutral-200"
+          className="rounded px-2 py-0.5 text-neutral-400 hover:text-neutral-200"
         >
           Show all {hidden.toLocaleString('en-US')}
         </button>
       ) : null}
-      <span className="text-neutral-600">
+      <span className="text-neutral-400">
         {hidden.toLocaleString('en-US')} {hidden === 1 ? 'line' : 'lines'} not shown
       </span>
     </div>

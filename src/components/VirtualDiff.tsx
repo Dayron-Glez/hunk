@@ -48,6 +48,9 @@ const MOVES: Readonly<Record<string, Move>> = {
 
 const ACTIVE_ROW = 'outline outline-1 -outline-offset-1 outline-sky-400/80'
 
+/** How far one press pans a line too wide for its column. */
+const PAN_PX = 120
+
 /** Stable per position, which is what `aria-activedescendant` needs to name. */
 const rowElementId = (position: number): string => `diff-row-${position}`
 
@@ -205,6 +208,15 @@ export function VirtualDiff({
     [folding, refold],
   )
 
+  // Folding from the keyboard changes the document without moving the focus,
+  // which a screen reader would otherwise pass over in silence.
+  const [announcement, setAnnouncement] = useState('')
+  const announce = useCallback((message: string) => {
+    // Re-announced even when the message repeats: two collapses in a row are
+    // two events, and an unchanged string is read once.
+    setAnnouncement((previous) => (previous === message ? `${message} ` : message))
+  }, [])
+
   /** Scroll only as far as it takes to bring a position into view. */
   const reveal = useCallback(
     (position: number) => {
@@ -237,12 +249,35 @@ export function VirtualDiff({
         const row = folding.rowAt(from)
         if (row === -1) return
         const kind = rows.kindAt(row)
-        if (kind === RowKind.FileHeader) toggleFile(rows.fileIndexAt(row))
-        else if (kind === RowKind.HunkHeader) {
-          toggleHunk({ file: rows.fileIndexAt(row), hunk: rows.hunkIndexAt(row) })
+        const ref = { file: rows.fileIndexAt(row), hunk: rows.hunkIndexAt(row) }
+
+        if (kind === RowKind.FileHeader) {
+          toggleFile(ref.file)
+          announce(`${folding.isFileCollapsed(ref.file) ? 'Expanded' : 'Collapsed'} file.`)
+        } else if (kind === RowKind.HunkHeader) {
+          toggleHunk(ref)
+          announce(`${folding.isHunkCollapsed(ref) ? 'Expanded' : 'Collapsed'} hunk.`)
+        } else if (folding.hiddenAfter(from) > 0) {
+          // The expander is out of the tab order, so this is how it is reached.
+          expandHunk(ref)
+          announce(`Showed ${Math.min(EXPAND_BY, folding.hiddenAfter(from))} more lines.`)
         } else return
+
         event.preventDefault()
         setActiveRow(row)
+        return
+      }
+
+      // Left and right pan a two-column row, whose cells each scroll on their
+      // own and are out of the tab order for it. In one column the whole grid
+      // scrolls sideways, so the browser's own handling is left alone.
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        const element = document.getElementById(rowElementId(from))
+        const panes = element?.querySelectorAll<HTMLElement>('[data-pan]') ?? []
+        if (panes.length === 0) return
+        event.preventDefault()
+        const by = event.key === 'ArrowRight' ? PAN_PX : -PAN_PX
+        for (const pane of panes) pane.scrollLeft += by
         return
       }
 
@@ -266,6 +301,8 @@ export function VirtualDiff({
       reveal,
       toggleFile,
       toggleHunk,
+      expandHunk,
+      announce,
     ],
   )
 
@@ -392,9 +429,12 @@ export function VirtualDiff({
           ? rowElementId(activePosition)
           : undefined
       }
-      className="h-full overflow-auto bg-neutral-950 font-mono text-xs focus:outline-none"
+      className="h-full overflow-auto bg-neutral-950 font-mono text-xs focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-400"
       data-testid="diff-scroller"
     >
+      <div role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
       {/* Sized for the whole document, so the reader can scroll to rows that
           are not in the DOM yet. */}
       <div role="presentation" style={{ height: shown.totalHeight }} className="relative">

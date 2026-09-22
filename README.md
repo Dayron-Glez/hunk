@@ -74,6 +74,39 @@ there would be a constant wearing a costume. What is measured instead is main-th
 while scrolling, and it is **zero in all sixteen runs**, with the instrument made to prove
 itself before each of them.
 
+## Reading it without a mouse, or without the screen
+
+The whole diff is **one tab stop**. Everything inside it is reached from there:
+arrows or `j`/`k` for a line, `n`/`p` for a hunk, `[`/`]` for a file, `Home` and `End`, `PageUp`
+and `PageDown`, `Enter` to fold whatever you are on, and left and right to pan a line too wide
+for its column.
+
+That is not a convenience, it is what virtualization forces. Only the rows on screen exist, so
+a tab order through them would walk a set that rearranges itself as the reader scrolls and
+whose length depends on the window — 18 stops in 37 rows on one real diff, before the controls
+are counted. Every control inside a row is therefore out of the tab order, and the keyboard
+reaches each of them from the grid.
+
+The same problem shapes what a screen reader gets. It can only read rows that are in the
+document, and at 100.000 lines that is about sixty of them. `aria-rowcount` and `aria-rowindex`
+are how a grid says "this is row 1.234 of 55.100" when 55.040 of those rows do not exist, and
+the keyboard is what brings any of them into the document to be read. It is navigable rather
+than complete, and that is a real cost of the approach rather than an oversight.
+
+Each line says what it is — "Added line 595." — because the gutter it replaces is two bare
+numbers and a punctuation mark read aloud. Those labels carry `select-none`, so copying a block
+of the diff still yields code and not code plus commentary.
+
+**Contrast is measured, not assumed.** Every text node on both screens and in both layouts is
+checked against the background it actually composites onto, with the WCAG AA threshold for its
+size: 484 elements in one column, 740 in two, and nothing under 4.5:1. That audit is what found
+the line numbers at **2.53:1** — `neutral-500` would not have fixed it either, at 3.54:1
+against a removed line.
+
+Nothing moves. There is one colour transition in the application and no animation, translation
+or smooth scrolling anywhere, so there is nothing for `prefers-reduced-motion` to turn off. A
+media query that switched nothing off would be decoration.
+
 ## Run the benchmark yourself
 
 A claim about speed that cannot be re-measured is an opinion.

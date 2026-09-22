@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { createEvent, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readFixture } from '../../tests/fixtures'
 import { EXPAND_BY, Folding, LARGE_HUNK } from '../core/layout/folding'
@@ -155,10 +155,11 @@ describe('two columns', () => {
     render(<VirtualDiff diff={diffOf('vite-pr-23378-new-files.diff')} mode="split" />)
 
     // A new file is all insertions, so every line of it has an empty left cell
-    // rather than pulling the right column up by one.
+    // rather than pulling the right column up by one. The cell is empty to
+    // look at and says so out loud, which is why this checks the label.
     const gapped = rowsOf().filter((row) => {
       const cells = cellsOf(row)
-      return cells.left === '' && cells.right !== ''
+      return cells.left === 'No line here before.' && cells.right !== ''
     })
     expect(gapped.length).toBeGreaterThan(10)
   })
@@ -523,5 +524,187 @@ describe('reading it with the keyboard', () => {
     const button = screen.getAllByRole('button', { name: /^Collapse / })[0]!
     fireEvent.keyDown(button, { key: 'ArrowDown', bubbles: true })
     expect(grid()).not.toHaveAttribute('aria-activedescendant')
+  })
+})
+
+/**
+ * What a reader who cannot see the screen gets, and what virtualization
+ * costs them.
+ */
+describe('reading it without seeing it', () => {
+  const grid = (): HTMLElement => screen.getByRole('grid')
+
+  it('says what each line is, since the gutter is hidden', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    expect(screen.getAllByText(/^Added line \d+\.$/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/^Removed line \d+\.$/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/^Line \d+\.$/).length).toBeGreaterThan(0)
+  })
+
+  it('keeps those labels out of the clipboard', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    // `sr-only` still copies with a selection; `select-none` is what stops it,
+    // so a copied block of the diff is code rather than code plus commentary.
+    for (const label of screen.getAllByText(/^Added line \d+\.$/)) {
+      expect(label.className).toContain('select-none')
+    }
+  })
+
+  it('names the empty half of a two-column row', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23378-new-files.diff')} mode="split" />)
+    expect(screen.getAllByText('No line here before.').length).toBeGreaterThan(0)
+  })
+
+  it('gives every row at least one cell', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    for (const row of Array.from(list().children)) {
+      expect(row.getAttribute('role')).toBe('row')
+      expect(row.querySelectorAll('[role="gridcell"]').length).toBeGreaterThan(0)
+    }
+  })
+
+  it('gives a two-column row two cells', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+
+    const lineRows = Array.from(list().children).filter(
+      (row) => row.querySelectorAll('[role="gridcell"]').length === 2,
+    )
+    expect(lineRows.length).toBeGreaterThan(10)
+  })
+
+  /**
+   * The cost of virtualization, stated rather than hidden: a screen reader can
+   * only reach the rows that exist. `aria-rowcount` and `aria-rowindex` are
+   * what make that navigable instead of merely broken — the reader is told
+   * there are 5.647 rows and which one they are on, and the keyboard brings
+   * any of them into the document.
+   */
+  it('admits how many rows there are when almost none of them exist', () => {
+    const diff = diffOf(BIG)
+    render(<VirtualDiff diff={diff} />)
+
+    const total = Folding.initial(new RowIndex(diff)).length
+    expect(Number(grid().getAttribute('aria-rowcount'))).toBe(total)
+    expect(list().childElementCount).toBeLessThan(total / 20)
+  })
+
+  it('keeps the row controls out of the tab order', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    // Tabbing a virtualized list would walk a set that rearranges itself as it
+    // scrolls, and whose length depends on the viewport. The grid is the one
+    // stop; Enter on the active row does what the buttons do.
+    for (const button of screen.getAllByRole('button')) {
+      expect(button).toHaveAttribute('tabindex', '-1')
+    }
+    expect(grid()).toHaveAttribute('tabindex', '0')
+  })
+
+  it('keeps a visible focus indicator on the one thing that takes focus', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+    expect(grid().className).not.toContain('focus:outline-none')
+    expect(grid().className).toContain('focus-visible:outline-2')
+  })
+
+  it('says out loud what a keystroke folded', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+    const live = grid().querySelector('[aria-live="polite"]')!
+    expect(live.textContent).toBe('')
+
+    fireEvent.keyDown(grid(), { key: 'Home' })
+    fireEvent.keyDown(grid(), { key: 'Enter' })
+    expect(live.textContent).toMatch(/Collapsed file\./)
+
+    fireEvent.keyDown(grid(), { key: 'Enter' })
+    expect(live.textContent).toMatch(/Expanded file\./)
+  })
+
+  it('reaches the expander from the keyboard, since it is not tabbable', () => {
+    globalThis.testViewportHeight = 100_000
+    const lines = LARGE_HUNK + 60
+    const diff = parseUnifiedDiff(
+      [
+        'diff --git a/big.ts b/big.ts',
+        '--- a/big.ts',
+        '+++ b/big.ts',
+        `@@ -1,${lines} +1,${lines} @@`,
+        ...Array.from({ length: lines }, (_, i) => ` line ${i}`),
+        '',
+      ].join(String.fromCharCode(10)),
+    )
+    render(<VirtualDiff diff={diff} />)
+
+    const before = list().childElementCount
+    // One file, one hunk: the last row shown is the truncated one.
+    fireEvent.keyDown(grid(), { key: 'End' })
+    fireEvent.keyDown(grid(), { key: 'Enter' })
+
+    expect(list().childElementCount).toBe(before + 60)
+    expect(grid().querySelector('[aria-live="polite"]')?.textContent).toMatch(
+      /Showed 60 more lines\./,
+    )
+  })
+})
+
+/**
+ * A scrollable box is a tab stop in Chrome, so the browser can scroll it from
+ * the keyboard. Inside a virtualized list that puts a stop on every long line
+ * on screen, in a set that rearranges itself as it scrolls — 18 of them in 37
+ * rows on a real diff. The grid stays the one stop and pans them instead.
+ */
+describe('long lines in two columns', () => {
+  const grid = (): HTMLElement => screen.getByRole('grid')
+
+  const panes = (): HTMLElement[] => Array.from(list().querySelectorAll<HTMLElement>('[data-pan]'))
+
+  it('keeps the scrollable cells out of the tab order', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+
+    expect(panes().length).toBeGreaterThan(10)
+    for (const pane of panes()) expect(pane).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('pans the row the reader is on with left and right', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+
+    fireEvent.keyDown(grid(), { key: 'Home' })
+    fireEvent.keyDown(grid(), { key: 'j' })
+    fireEvent.keyDown(grid(), { key: 'j' })
+
+    const id = grid().getAttribute('aria-activedescendant')!
+    const row = document.getElementById(id)!
+    const pane = row.querySelector<HTMLElement>('[data-pan]')!
+    expect(pane.scrollLeft).toBe(0)
+
+    fireEvent.keyDown(grid(), { key: 'ArrowRight' })
+    expect(pane.scrollLeft).toBeGreaterThan(0)
+
+    fireEvent.keyDown(grid(), { key: 'ArrowLeft' })
+    expect(pane.scrollLeft).toBe(0)
+  })
+
+  it('leaves the arrows to the browser in one column, where the grid scrolls', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    fireEvent.keyDown(grid(), { key: 'Home' })
+    fireEvent.keyDown(grid(), { key: 'j' })
+
+    // Nothing to pan: a unified row has no cell of its own to scroll, so the
+    // event is not taken and the scroller handles it natively.
+    const event = createEvent.keyDown(grid(), { key: 'ArrowRight' })
+    fireEvent(grid(), event)
+    expect(event.defaultPrevented).toBe(false)
   })
 })
