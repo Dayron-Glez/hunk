@@ -64,6 +64,13 @@ re-measured with styles before anything was compared against it.
 
 Four synthetic sizes and three real diffs.
 
+There are two synthetic shapes because one was not enough. `synthetic-100k` pairs a removal
+with an unrelated insertion, so the intra-line diff correctly finds nothing and the case
+measures none of that work — 2% of its lines are paired, against 11% of the kernel's.
+`synthetic-100k-edits` matches the real shape instead: a little context, then a replacement, a
+pure addition or a pure deletion, the way a real diff moves. The older case keeps its bytes, so
+the F0, F1 and F2 baselines stay comparable.
+
 The synthetic ones exist because they are the only way to ask "what happens at exactly 100.000
 lines". They are built by `synthetic.mjs` from a seeded generator: the same size always
 produces the same bytes, so a number measured today can be compared with one measured in three
@@ -114,6 +121,7 @@ says what they are, and those _are_ committed:
 | `f0-naive-render.json` | Every line in the DOM, nothing virtualized. The measurement F1 had to beat.    |
 | `f1-virtualized.json`  | Only the visible rows in the DOM, heights measured and corrected as they land. |
 | `f2-highlighted.json`  | The same, with syntax highlighting arriving from a worker.                     |
+| `f3-word-diff.json`    | The same, marking what changed inside a line.                                  |
 
 Copy `latest.json` to a new name whenever a run is worth keeping. Without that, the first run
 after a change destroys the number the change was supposed to be compared against.

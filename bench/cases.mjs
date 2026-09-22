@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildSyntheticDiff } from './synthetic.mjs'
+import { buildEditedDiff, buildSyntheticDiff } from './synthetic.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = join(here, '..')
@@ -16,6 +16,12 @@ export const CASES = [
   { name: 'synthetic-10k', label: '10k lines', kind: 'synthetic', lines: 10_000 },
   { name: 'synthetic-50k', label: '50k lines', kind: 'synthetic', lines: 50_000 },
   { name: 'synthetic-100k', label: '100k lines', kind: 'synthetic', lines: 100_000 },
+  {
+    name: 'synthetic-100k-edits',
+    label: '100k lines of real edits',
+    kind: 'edited',
+    lines: 100_000,
+  },
   {
     name: 'real-kernel',
     label: 'Linux kernel commit — 758 files',
@@ -44,7 +50,9 @@ export function materializeCases(outDir) {
     const source =
       testCase.kind === 'synthetic'
         ? buildSyntheticDiff(testCase.lines)
-        : readFileSync(join(repoRoot, 'fixtures', testCase.fixture), 'utf8')
+        : testCase.kind === 'edited'
+          ? buildEditedDiff(testCase.lines)
+          : readFileSync(join(repoRoot, 'fixtures', testCase.fixture), 'utf8')
 
     writeFileSync(join(outDir, `${testCase.name}.diff`), source)
     return { ...testCase, bytes: Buffer.byteLength(source) }

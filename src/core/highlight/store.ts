@@ -42,7 +42,10 @@ interface Entry {
   /** Hunk line index to document line index, one array per side. */
   readonly oldLines: Uint32Array
   readonly newLines: Uint32Array
-  /** Hunk line index to the parts of it that changed. */
+  readonly lines: readonly DiffLine[]
+  /** Which line replaced which. One cheap scan; no comparing yet. */
+  readonly pairs: ReadonlyMap<number, number>
+  /** Hunk line index to the parts of it that changed. Filled as rows are drawn. */
   readonly ranges: Map<number, readonly Range[]>
   oldTokens: FlatTokens | null
   newTokens: FlatTokens | null
@@ -124,7 +127,7 @@ export class HighlightStore {
     if (line === null || lineIndex === -1) return null
 
     const spans = this.spansFor(row)
-    const ranges = entry.ranges.get(lineIndex) ?? []
+    const ranges = changesFor(entry, lineIndex)
     if (spans === null && ranges.length === 0) return null
 
     return mergeSegments(line.content.length, spans, ranges)
@@ -133,6 +136,13 @@ export class HighlightStore {
   /** Hunks asked for so far, for tests and for the benchmark to report. */
   get requested(): number {
     return this.entries.size
+  }
+
+  /** Lines whose intra-line changes have been worked out. For tests. */
+  get diffedLines(): number {
+    let total = 0
+    for (const entry of this.entries.values()) total += entry?.ranges.size ?? 0
+    return total
   }
 
   private keyOf(row: number): number {
@@ -156,7 +166,9 @@ export class HighlightStore {
       sides,
       oldLines: reverse(sides.old?.lines, hunk.lines.length),
       newLines: reverse(sides.new?.lines, hunk.lines.length),
-      ranges: intralineChanges(hunk.lines),
+      lines: hunk.lines,
+      pairs: pairChangedLines(hunk.lines),
+      ranges: new Map(),
       oldTokens: null,
       newTokens: null,
       done: false,
@@ -197,18 +209,38 @@ function reverse(lines: Uint32Array | undefined, hunkLineCount: number): Uint32A
   return out
 }
 
-function intralineChanges(lines: readonly DiffLine[]): Map<number, readonly Range[]> {
-  const ranges = new Map<number, readonly Range[]>()
-  const pairs = pairChangedLines(lines)
+const NO_RANGES: readonly Range[] = []
 
-  for (const [from, to] of pairs) {
-    if (lines[from]?.kind !== 'delete') continue
-    const before = lines[from]?.content ?? ''
-    const after = lines[to]?.content ?? ''
-    const changes = wordDiff(before, after)
-    if (changes.before.length > 0) ranges.set(from, changes.before)
-    if (changes.after.length > 0) ranges.set(to, changes.after)
+/**
+ * What changed inside one line, worked out the first time it is drawn.
+ *
+ * Per line rather than per hunk. On this corpus the difference is small — the
+ * worst hunk holds 131 pairs and costs 1.2 ms — because large hunks tend to be
+ * wholesale additions with nothing to compare. It is per line anyway: the cost
+ * of the hunk-at-a-time version scales with input nobody has scrolled to, and
+ * that is the shape of cost this viewer exists to avoid. Both sides of a pair
+ * are stored together because finding one finds the other.
+ */
+function changesFor(entry: Entry, lineIndex: number): readonly Range[] {
+  const cached = entry.ranges.get(lineIndex)
+  if (cached !== undefined) return cached
+
+  const partner = entry.pairs.get(lineIndex)
+  if (partner === undefined) {
+    entry.ranges.set(lineIndex, NO_RANGES)
+    return NO_RANGES
   }
 
-  return ranges
+  const isDeletion = entry.lines[lineIndex]?.kind === 'delete'
+  const deleted = isDeletion ? lineIndex : partner
+  const inserted = isDeletion ? partner : lineIndex
+
+  const changes = wordDiff(
+    entry.lines[deleted]?.content ?? '',
+    entry.lines[inserted]?.content ?? '',
+  )
+  entry.ranges.set(deleted, changes.before)
+  entry.ranges.set(inserted, changes.after)
+
+  return entry.ranges.get(lineIndex) ?? NO_RANGES
 }
