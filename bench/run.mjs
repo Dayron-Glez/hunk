@@ -21,6 +21,10 @@ const resultsDir = join(here, 'results')
 
 const REPEATS = 3
 
+/** Both layouts by default: a two-column view that is never measured is a
+ *  feature with no number, in a project whose whole claim is a number. */
+const LAYOUTS = ['unified', 'split']
+
 const run = async () => {
   console.log('Building the harness…')
   execFileSync('npx', ['vite', 'build', '--config', join(here, 'vite.config.ts')], {
@@ -32,6 +36,8 @@ const run = async () => {
   console.log('Writing cases…')
   const argv = process.argv.slice(2)
   const headed = argv.includes('--headed')
+  const chosen = LAYOUTS.filter((layout) => argv.includes(`--${layout}`))
+  const layouts = chosen.length === 0 ? LAYOUTS : chosen
   const filters = argv.filter((a) => !a.startsWith('--'))
   const cases = materializeCases(join(distDir, 'cases')).filter(
     (testCase) => filters.length === 0 || filters.some((f) => testCase.name.includes(f)),
@@ -66,35 +72,38 @@ const run = async () => {
 
   try {
     for (const testCase of cases) {
-      process.stdout.write(`\n${testCase.label}\n`)
-      const runs = []
+      for (const layout of layouts) {
+        process.stdout.write(`\n${testCase.label} — ${layout}\n`)
+        const runs = []
 
-      for (let attempt = 0; attempt < REPEATS; attempt += 1) {
-        process.stdout.write(`  run ${attempt + 1}/${REPEATS}… `)
-        const measurement = await measureOnce(browser, origin, testCase.name)
-        runs.push(measurement)
-        process.stdout.write(`${measurement.totalMs} ms\n`)
+        for (let attempt = 0; attempt < REPEATS; attempt += 1) {
+          process.stdout.write(`  run ${attempt + 1}/${REPEATS}… `)
+          const measurement = await measureOnce(browser, origin, testCase.name, layout)
+          runs.push(measurement)
+          process.stdout.write(`${measurement.totalMs} ms\n`)
+        }
+
+        // Frame rate and memory come from the last run only: they need a live
+        // page, and repeating a three-second scroll for every attempt would
+        // triple the wall clock for a number that barely moves between runs.
+        const last = runs[runs.length - 1]
+
+        results.push({
+          name: testCase.name,
+          label: testCase.label,
+          layout,
+          bytes: testCase.bytes,
+          files: last.files,
+          lines: last.lines,
+          parseMs: median(runs.map((entry) => entry.parseMs)),
+          renderMs: median(runs.map((entry) => entry.renderMs)),
+          totalMs: median(runs.map((entry) => entry.totalMs)),
+          runs: runs.map((entry) => entry.totalMs),
+          scroll: last.scroll,
+          memoryMB: last.memoryMB,
+          domNodes: last.domNodes,
+        })
       }
-
-      // Frame rate and memory come from the last run only: they need a live
-      // page, and repeating a three-second scroll for every attempt would
-      // triple the wall clock for a number that barely moves between runs.
-      const last = runs[runs.length - 1]
-
-      results.push({
-        name: testCase.name,
-        label: testCase.label,
-        bytes: testCase.bytes,
-        files: last.files,
-        lines: last.lines,
-        parseMs: median(runs.map((entry) => entry.parseMs)),
-        renderMs: median(runs.map((entry) => entry.renderMs)),
-        totalMs: median(runs.map((entry) => entry.totalMs)),
-        runs: runs.map((entry) => entry.totalMs),
-        scroll: last.scroll,
-        memoryMB: last.memoryMB,
-        domNodes: last.domNodes,
-      })
     }
   } finally {
     await browser.close()
@@ -120,7 +129,7 @@ const run = async () => {
   console.log(`\nWritten to ${target}`)
 }
 
-async function measureOnce(browser, origin, caseName) {
+async function measureOnce(browser, origin, caseName, layout) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   const page = await context.newPage()
   const client = await context.newCDPSession(page)
@@ -138,7 +147,9 @@ async function measureOnce(browser, origin, caseName) {
   })
 
   try {
-    await page.goto(`${origin}/index.html?case=${caseName}`, { waitUntil: 'commit' })
+    await page.goto(`${origin}/index.html?case=${caseName}&mode=${layout}`, {
+      waitUntil: 'commit',
+    })
     try {
       await page.waitForFunction(() => window.__bench?.timings != null, null, { timeout: 600_000 })
     } catch (error) {
@@ -151,6 +162,12 @@ async function measureOnce(browser, origin, caseName) {
     }
 
     const timings = await page.evaluate(() => window.__bench.timings)
+    // The harness reports which layout it actually rendered. Without this a
+    // typo in the query string would quietly measure unified twice and publish
+    // it as a comparison.
+    if (timings.mode !== layout) {
+      throw new Error(`asked for the ${layout} layout and the harness rendered ${timings.mode}`)
+    }
     const scroll = await page.evaluate(() => window.__bench.measureScroll())
 
     // Collect garbage first, so the number is what the page is holding rather
@@ -171,11 +188,12 @@ async function measureOnce(browser, origin, caseName) {
 }
 
 function report(results) {
-  const line = '─'.repeat(104)
+  const line = '─'.repeat(113)
   console.log()
   console.log(line)
   console.log(
     pad('case', 30) +
+      pad('layout', 9) +
       pad('lines', 9, true) +
       pad('parse', 9, true) +
       pad('render', 10, true) +
@@ -187,9 +205,16 @@ function report(results) {
   )
   console.log(line)
 
+  // Grouped by case so the two layouts of one diff sit next to each other,
+  // which is the only comparison worth reading here.
+  let previous = null
   for (const entry of results) {
+    const firstOfCase = entry.name !== previous
+    if (previous !== null && firstOfCase) console.log()
+    previous = entry.name
     console.log(
-      pad(entry.label.slice(0, 29), 30) +
+      pad(firstOfCase ? entry.label.slice(0, 29) : '', 30) +
+        pad(entry.layout, 9) +
         pad(entry.lines.toLocaleString('en-US'), 9, true) +
         pad(`${entry.parseMs} ms`, 9, true) +
         pad(`${entry.renderMs} ms`, 10, true) +

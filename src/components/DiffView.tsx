@@ -8,8 +8,16 @@ const MODES: readonly { readonly mode: LayoutMode; readonly label: string }[] = 
   { mode: 'split', label: 'Split' },
 ]
 
-export function DiffView({ diff }: { readonly diff: ParsedDiff }) {
-  const [mode, setMode] = useState<LayoutMode>('unified')
+export function DiffView({
+  diff,
+  initialMode = 'unified',
+}: {
+  readonly diff: ParsedDiff
+  /** Which layout to open in. The benchmark uses it to measure a first paint
+   *  in either one; a reader's own choice lives in the state below. */
+  readonly initialMode?: LayoutMode
+}) {
+  const [mode, setMode] = useState<LayoutMode>(initialMode)
 
   if (diff.files.length === 0) {
     return <p className="p-6 text-sm text-neutral-500">Nothing to show — this diff is empty.</p>
