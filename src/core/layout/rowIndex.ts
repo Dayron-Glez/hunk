@@ -1,12 +1,7 @@
 import type { DiffFile, DiffLine, Hunk, ParsedDiff } from '../parse/types'
 
-/**
- * What a single row of the rendered document is.
- *
- * A plain object rather than an enum, because the build bans syntax that cannot
- * be erased, and because the values have to be numbers anyway to live in a
- * typed array.
- */
+/** An object rather than an enum: the build bans non-erasable syntax, and the
+ *  values have to be numbers anyway to live in a typed array. */
 export const RowKind = {
   FileHeader: 0,
   /** A file with nothing to show: binary, a mode change, a move with no edits. */
@@ -21,16 +16,13 @@ export type RowKind = (typeof RowKind)[keyof typeof RowKind]
 const ABSENT = 0xffffffff
 
 /**
- * The diff flattened into a numbered list of rows.
+ * The diff flattened into a numbered list of rows, so "what is row 47.312?" is
+ * answered without walking the file and hunk structure — a different row, on
+ * every frame.
  *
- * Virtualization needs to answer "what is row 47.312?" without walking the file
- * and hunk structure to find out, and it needs to do it for a different row on
- * every frame. This builds that answer once, as a set of parallel typed arrays:
- * thirteen bytes per row, so a 100.000-line diff indexes in 1.3 MB.
- *
- * The same information as objects would cost tens of megabytes against a budget
- * of eighty, and would hand the garbage collector a million small allocations
- * during the one moment — first paint — when it can least afford them.
+ * Parallel typed arrays at thirteen bytes a row: 1.3 MB for a 100.000-line
+ * diff, against tens of megabytes as objects and a million small allocations
+ * handed to the collector during first paint.
  */
 export class RowIndex {
   private readonly kinds: Uint8Array
