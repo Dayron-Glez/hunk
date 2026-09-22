@@ -182,3 +182,108 @@ describe('two columns', () => {
     expect(checked).toBeGreaterThan(0)
   })
 })
+
+describe('folding', () => {
+  const rowTexts = (): string[] => Array.from(list().children).map((row) => row.textContent ?? '')
+
+  const chevrons = (): HTMLElement[] =>
+    screen.getAllByRole('button', { name: /^(Collapse|Expand) / })
+
+  it('takes a file down to its header and puts it back', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    const open = list().childElementCount
+    fireEvent.click(chevrons()[0]!)
+    const folded = list().childElementCount
+    expect(folded).toBeLessThan(open)
+
+    fireEvent.click(chevrons()[0]!)
+    expect(list().childElementCount).toBe(open)
+  })
+
+  it('leaves the hunk header behind when a hunk folds', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    const hunkChevron = screen.getAllByRole('button', { name: /^Collapse @@/ })[0]!
+    const before = rowTexts().filter((t) => t.startsWith('@@')).length
+    fireEvent.click(hunkChevron)
+
+    expect(rowTexts().filter((t) => t.startsWith('@@')).length).toBe(before)
+    expect(screen.getAllByRole('button', { name: /^Expand @@/ }).length).toBe(1)
+  })
+
+  it('says whether each control is expanded', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    const first = chevrons()[0]!
+    expect(first).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(first)
+    expect(chevrons()[0]!).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('still windows a folded document rather than rendering all of it', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+    fireEvent.click(chevrons()[0]!)
+    expect(list().childElementCount).toBeLessThan(100)
+  })
+})
+
+/**
+ * The reason folding is a projection over the index rather than a new index.
+ * A fold above the reader moves everything below it; if the scroll position
+ * does not move with it, the line they were reading slides away.
+ */
+describe('folding keeps the reader where they were', () => {
+  const chevronFor = (name: RegExp): HTMLElement => screen.getAllByRole('button', { name })[0]!
+
+  /** The row the viewport actually starts on. `children[0]` is overscan. */
+  const rowAtTop = (): string => {
+    const offset = Number.parseFloat(
+      /translateY\(([\d.]+)px\)/.exec(list().style.transform)?.[1] ?? '0',
+    )
+    const index = Math.round((scroller().scrollTop - offset) / globalThis.testRowHeight)
+    return list().children[index]?.textContent ?? ''
+  }
+
+  it('holds the top row still when a file above collapses', () => {
+    const diff = diffOf(BIG)
+    render(<VirtualDiff diff={diff} />)
+
+    const view = scroller()
+    view.scrollTop = 4_000
+    fireEvent.scroll(view)
+
+    const topBefore = rowAtTop()
+    const heightBefore = Number.parseFloat(list().parentElement!.style.height)
+    expect(topBefore).not.toBe('')
+
+    fireEvent.click(chevronFor(/^Collapse /))
+
+    // The document got shorter, so staying at 4.000 would show different rows.
+    expect(Number.parseFloat(list().parentElement!.style.height)).toBeLessThan(heightBefore)
+    expect(view.scrollTop).toBeLessThan(4_000)
+    expect(rowAtTop()).toBe(topBefore)
+  })
+
+  it('lands on the header of the file it just collapsed', () => {
+    const diff = diffOf('vite-pr-23378-new-files.diff')
+    globalThis.testViewportHeight = 200
+    render(<VirtualDiff diff={diff} />)
+
+    const view = scroller()
+    view.scrollTop = 600
+    fireEvent.scroll(view)
+
+    // Whichever file the reader is inside: collapsing it takes the anchor row
+    // away, and the nearest surviving row above it is that file's header.
+    const inside = list().children[0]?.textContent ?? ''
+    expect(inside).not.toBe('')
+
+    fireEvent.click(chevronFor(/^Collapse /))
+    expect(view.scrollTop).toBeGreaterThanOrEqual(0)
+    expect(list().childElementCount).toBeGreaterThan(0)
+  })
+})
