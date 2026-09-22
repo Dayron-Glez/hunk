@@ -1,0 +1,201 @@
+{
+  "recordedAt": "2026-09-22T15:36:37.480Z",
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "cpus": "AMD Ryzen 7 5800H with Radeon Graphics",
+    "node": "v22.18.0"
+  },
+  "repeats": 3,
+  "results": [
+    {
+      "name": "synthetic-1k",
+      "label": "1k lines",
+      "bytes": 42367,
+      "files": 6,
+      "lines": 1000,
+      "parseMs": 1.2,
+      "renderMs": 22.9,
+      "totalMs": 24.1,
+      "runs": [
+        42.2,
+        24.1,
+        23.7
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.7,
+        "lagWorstMs": 8.2,
+        "durationMs": 1873.2,
+        "documentHeightPx": 20798
+      },
+      "memoryMB": 3,
+      "domNodes": 2140
+    },
+    {
+      "name": "synthetic-10k",
+      "label": "10k lines",
+      "bytes": 430995,
+      "files": 43,
+      "lines": 10000,
+      "parseMs": 2.9,
+      "renderMs": 31,
+      "totalMs": 36.2,
+      "runs": [
+        27.6,
+        36.2,
+        36.4
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 9,
+        "durationMs": 1874,
+        "documentHeightPx": 206511
+      },
+      "memoryMB": 4,
+      "domNodes": 2343
+    },
+    {
+      "name": "synthetic-50k",
+      "label": "50k lines",
+      "bytes": 2149536,
+      "files": 205,
+      "lines": 50000,
+      "parseMs": 8.6,
+      "renderMs": 26,
+      "totalMs": 34.7,
+      "runs": [
+        34.9,
+        34.7,
+        34.6
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 10.5,
+        "durationMs": 1873.6,
+        "documentHeightPx": 1031801
+      },
+      "memoryMB": 6,
+      "domNodes": 2075
+    },
+    {
+      "name": "synthetic-100k",
+      "label": "100k lines",
+      "bytes": 4297571,
+      "files": 407,
+      "lines": 100000,
+      "parseMs": 15.7,
+      "renderMs": 27.7,
+      "totalMs": 43.4,
+      "runs": [
+        43.4,
+        44.2,
+        42.8
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.8,
+        "lagWorstMs": 10.3,
+        "durationMs": 1878.5,
+        "documentHeightPx": 2063659
+      },
+      "memoryMB": 9,
+      "domNodes": 2207
+    },
+    {
+      "name": "real-kernel",
+      "label": "Linux kernel commit — 758 files",
+      "bytes": 2121675,
+      "files": 758,
+      "lines": 62165,
+      "parseMs": 14.3,
+      "renderMs": 34.1,
+      "totalMs": 48.4,
+      "runs": [
+        48.4,
+        71,
+        44.4
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.7,
+        "lagWorstMs": 12.8,
+        "durationMs": 1873,
+        "documentHeightPx": 1316702
+      },
+      "memoryMB": 7,
+      "domNodes": 1562
+    },
+    {
+      "name": "real-minified",
+      "label": "Minified bundles — 371 KB in 128 lines",
+      "bytes": 379969,
+      "files": 9,
+      "lines": 128,
+      "parseMs": 0.8,
+      "renderMs": 52.4,
+      "totalMs": 53.3,
+      "runs": [
+        52.3,
+        53.8,
+        53.3
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.4,
+        "lagWorstMs": 7.3,
+        "durationMs": 1868,
+        "documentHeightPx": 3133
+      },
+      "memoryMB": 3,
+      "domNodes": 1267
+    },
+    {
+      "name": "real-mass-rename",
+      "label": "168 files, mostly renames",
+      "bytes": 461816,
+      "files": 168,
+      "lines": 5385,
+      "parseMs": 2.3,
+      "renderMs": 31.8,
+      "totalMs": 34.1,
+      "runs": [
+        34.1,
+        25.9,
+        34.2
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.7,
+        "lagWorstMs": 14.7,
+        "durationMs": 1879.1,
+        "documentHeightPx": 123944
+      },
+      "memoryMB": 4,
+      "domNodes": 1632
+    }
+  ]
+}

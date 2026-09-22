@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+import type { Span } from '../core/highlight/tokens'
 import type { DiffLine } from '../core/parse/types'
 
 const ROW_STYLES: Record<DiffLine['kind'], string> = {
@@ -18,7 +20,13 @@ const MARKER_STYLES: Record<DiffLine['kind'], string> = {
   delete: 'text-rose-400',
 }
 
-export function DiffRow({ line }: { readonly line: DiffLine }) {
+export function DiffRow({
+  line,
+  spans,
+}: {
+  readonly line: DiffLine
+  readonly spans: readonly Span[] | null
+}) {
   return (
     <div className={`flex min-h-5 w-max min-w-full leading-5 ${ROW_STYLES[line.kind]}`}>
       {/* Sticky so the numbers stay put while a long line scrolls, and unselectable
@@ -37,10 +45,26 @@ export function DiffRow({ line }: { readonly line: DiffLine }) {
           {MARKERS[line.kind]}
         </span>
       </div>
-      <span className="whitespace-pre text-neutral-200">{line.content}</span>
+      <span className="whitespace-pre text-neutral-200">
+        {spans === null
+          ? line.content
+          : spans.map((span, index) => (
+              <span key={index} style={styleOf(span)}>
+                {line.content.slice(span.start, span.end)}
+              </span>
+            ))}
+      </span>
       {line.noNewlineAtEof ? (
         <span className="pl-4 text-neutral-500 italic select-none">no newline at end of file</span>
       ) : null}
     </div>
   )
+}
+
+function styleOf(span: Span): CSSProperties {
+  const style: CSSProperties = { color: span.color }
+  if (span.italic) style.fontStyle = 'italic'
+  if (span.bold) style.fontWeight = 'bold'
+  if (span.underline) style.textDecoration = 'underline'
+  return style
 }

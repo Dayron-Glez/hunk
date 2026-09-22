@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { HighlightStore } from '../core/highlight/store'
+import type { Span } from '../core/highlight/tokens'
 import { RowIndex, RowKind } from '../core/layout/rowIndex'
 import { Virtualizer, type VisibleWindow } from '../core/layout/virtualizer'
 import type { ParsedDiff } from '../core/parse/types'
+import { HighlightClient } from '../workers/highlightClient'
 import { DiffRow } from './DiffRow'
 import { FileHeaderRow, HunkHeaderRow, NoteRow } from './rows'
 
@@ -35,6 +38,29 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
   const viewportHeight = useRef(0)
 
   const [view, setView] = useState<VisibleWindow>(() => virtualizer.visible)
+  // Bumped when colours land, which is the only thing that makes this render
+  // without the window having moved.
+  const [coloured, setColoured] = useState(0)
+
+  const highlights = useMemo(() => {
+    const client = new HighlightClient()
+    const store = new HighlightStore(rows, client, () => {
+      setColoured((n) => n + 1)
+    })
+    return { client, store }
+  }, [rows])
+
+  useEffect(
+    () => () => {
+      highlights.client.dispose()
+    },
+    [highlights],
+  )
+
+  // Only what is on screen, plus the overscan the window already carries.
+  useEffect(() => {
+    highlights.store.requestRange(view.first, view.last)
+  }, [highlights, view.first, view.last])
 
   const refresh = useCallback(() => {
     const scroller = scrollerRef.current
@@ -95,8 +121,9 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
 
   const visibleRows = []
   for (let row = view.first; row <= view.last; row += 1) {
-    visibleRows.push(<Row key={row} rows={rows} row={row} />)
+    visibleRows.push(<Row key={row} rows={rows} row={row} spans={highlights.store.spansFor(row)} />)
   }
+  void coloured
 
   return (
     <div
@@ -118,7 +145,15 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
   )
 }
 
-function Row({ rows, row }: { readonly rows: RowIndex; readonly row: number }) {
+function Row({
+  rows,
+  row,
+  spans,
+}: {
+  readonly rows: RowIndex
+  readonly row: number
+  readonly spans: readonly Span[] | null
+}) {
   switch (rows.kindAt(row)) {
     case RowKind.FileHeader:
       return <FileHeaderRow file={rows.fileAt(row)} />
@@ -127,7 +162,7 @@ function Row({ rows, row }: { readonly rows: RowIndex; readonly row: number }) {
     case RowKind.HunkHeader:
       return <HunkHeaderRow hunk={rows.hunkAt(row)!} />
     default:
-      return <DiffRow line={rows.lineAt(row)!} />
+      return <DiffRow line={rows.lineAt(row)!} spans={spans} />
   }
 }
 

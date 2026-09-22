@@ -3,29 +3,32 @@
 A diff viewer for the files that bring the others down. Paste a GitHub pull request URL, drop
 two files or a `.patch`, and read it.
 
-> **Status: F1 complete — every target is met, with room to spare.**
-> Variable-height virtualization is in. The numbers below are measured, reproducible, and the
-> before-and-after comes from the same machine on the same day.
+> **Status: F2 complete — every target is met, with room to spare.**
+> Variable-height virtualization, and syntax highlighting that arrives from a worker without
+> touching first paint. The numbers below are measured and reproducible.
 
 ## Where it stands today
 
 Only the rows on screen exist in the DOM. Heights start as estimates and are corrected as rows
 appear, with the scroll position adjusted in the same frame so nothing moves under the reader.
+Colours are computed off the main thread and land when they land — the diff is readable before
+they do.
 
 Measured on an AMD Ryzen 7 5800H against a production build, median of three runs each in a
 fresh page.
 
 | Case                     |   Lines | Before | **First paint** | Memory | DOM nodes |
 | ------------------------ | ------: | -----: | --------------: | -----: | --------: |
-| Synthetic                |   1,000 |  71 ms |       **22 ms** |   3 MB |     1,051 |
-| Synthetic                |  10,000 | 429 ms |       **34 ms** |   3 MB |     1,053 |
-| Synthetic                |  50,000 | 2.17 s |       **34 ms** |   5 MB |     1,045 |
-| Synthetic                | 100,000 | 4.52 s |       **42 ms** |   8 MB |     1,049 |
-| Linux kernel commit      |  62,165 | 3.07 s |       **41 ms** |   6 MB |       956 |
-| Minified bundles, 371 KB |     128 |  52 ms |       **47 ms** |   2 MB |       717 |
-| 168 files, mostly moved  |   5,385 | 269 ms |       **31 ms** |   3 MB |     1,009 |
+| Synthetic                |   1,000 |  71 ms |       **24 ms** |   3 MB |     2,140 |
+| Synthetic                |  10,000 | 429 ms |       **36 ms** |   4 MB |     2,343 |
+| Synthetic                |  50,000 | 2.17 s |       **35 ms** |   6 MB |     2,075 |
+| Synthetic                | 100,000 | 4.52 s |       **43 ms** |   9 MB |     2,207 |
+| Linux kernel commit      |  62,165 | 3.07 s |       **48 ms** |   7 MB |     1,562 |
+| Minified bundles, 371 KB |     128 |  52 ms |       **53 ms** |   3 MB |     1,267 |
+| 168 files, mostly moved  |   5,385 | 269 ms |       **34 ms** |   4 MB |     1,632 |
 
-At 100.000 lines that is **108× faster, 18× lighter, and 953× fewer DOM nodes**.
+At 100.000 lines that is **104× faster, 16× lighter, and 453× fewer DOM nodes** — with the
+syntax highlighting on.
 
 Read the last column first. **The DOM stops growing with the diff**: about a thousand nodes
 whether the file has a thousand lines or a hundred thousand. Everything else follows from
@@ -47,7 +50,12 @@ Two rows are worth more than the headline:
 | FPS while scrolling | 60        | 60        | ≥ 50       |
 | Memory              | < 15 MB   | < 40 MB   | < 80 MB    |
 
-**First paint and memory are met at every size**, by 4× at 10k lines and 21× at 100k. Frame
+Highlighting cost **+1.6 ms at 100.000 lines** and about a megabyte, because it happens in a
+worker and the page never waits for it. It roughly doubles the DOM — a line becomes a handful
+of spans rather than one text node — but that is still a fixed cost per screen rather than one
+that grows with the diff.
+
+**First paint and memory are met at every size**, by 4× at 10k lines and 20× at 100k. Frame
 rate is still unmeasured rather than met — `bench/README.md` explains why a number from a
 headless browser there would be a constant wearing a costume, and what is measured instead.
 
