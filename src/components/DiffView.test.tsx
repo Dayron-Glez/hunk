@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readFixture } from '../../tests/fixtures'
 import { parseUnifiedDiff } from '../core/parse/unified'
@@ -89,5 +89,31 @@ describe('DiffView', () => {
     )
     expect(screen.getByText(/combined \(merge\) diffs are not supported/)).toBeInTheDocument()
     expect(screen.getByText('Combined diff from a merge — not supported yet.')).toBeInTheDocument()
+  })
+})
+
+describe('choosing a layout', () => {
+  it('starts unified, with one line per row', () => {
+    renderFixture('edge', 'mode-change-with-content.diff')
+    expect(screen.getByRole('button', { name: 'Unified' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('puts the two versions of an edited line on one row when asked to', () => {
+    renderFixture('edge', 'mode-change-with-content.diff')
+    fireEvent.click(screen.getByRole('button', { name: 'Split' }))
+
+    const rows = Array.from(
+      screen.getByTestId('diff-scroller').querySelector('[data-rows]')!.children,
+    ) as HTMLElement[]
+    const paired = rows.find((row) => row.children[0]?.textContent?.includes('bravo') === true)
+    expect(paired?.children[1]?.textContent).toContain('BRAVO')
+  })
+
+  it('goes back to one column', () => {
+    renderFixture('edge', 'mode-change-with-content.diff')
+    fireEvent.click(screen.getByRole('button', { name: 'Split' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Unified' }))
+    expect(screen.getByRole('button', { name: 'Unified' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('alpha')).toBeInTheDocument()
   })
 })
