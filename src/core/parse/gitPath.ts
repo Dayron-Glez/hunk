@@ -16,11 +16,9 @@ const SHORT_ESCAPES = new Map<string, number>([
 const utf8 = new TextDecoder('utf-8')
 
 /**
- * Undo the quoting git applies to a path it cannot write literally. Anything
- * outside printable ASCII comes back as octal escapes of the *bytes*, so the
- * escapes have to be collected into bytes and decoded as UTF-8 as a unit —
- * decoding them one at a time would turn every multi-byte character into
- * mojibake.
+ * Undo the quoting git applies to a path it cannot write literally. The escapes
+ * are octal *bytes*, so they have to be collected and decoded as UTF-8 as a
+ * unit — one at a time turns every multi-byte character into mojibake.
  */
 export function unquoteGitPath(raw: string): string {
   if (raw.length < 2 || raw.charCodeAt(0) !== QUOTE || raw.charCodeAt(raw.length - 1) !== QUOTE) {
@@ -71,11 +69,8 @@ function pushUtf8(bytes: number[], char: string): void {
   for (const byte of new TextEncoder().encode(char)) bytes.push(byte)
 }
 
-/**
- * Read a path off a `---`/`+++` line. git terminates the path with a tab whenever
- * it contains whitespace, and a tab is never part of an unquoted path, so the tab
- * marks the end.
- */
+/** Read a path off a `---`/`+++` line. git terminates it with a tab whenever it
+ *  contains whitespace, and a tab is never part of an unquoted path. */
 export function readMarkerPath(rest: string): string {
   const tab = rest.indexOf('\t')
   return unquoteGitPath(tab === -1 ? rest : rest.slice(0, tab))

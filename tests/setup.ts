@@ -5,13 +5,10 @@ import { afterEach } from 'vitest'
 afterEach(cleanup)
 
 /**
- * jsdom parses and builds a DOM but never lays it out: every element is zero by
- * zero and `ResizeObserver` does not exist at all. A virtualized list asks both
- * of those questions constantly, so without the stubs below it renders nothing
- * and the tests would only prove that nothing is nothing.
- *
- * These are deliberately crude. They make the component answerable in a test,
- * not realistic — the real numbers come from the benchmark, in a real browser.
+ * jsdom never lays out — every element is zero by zero — and has no
+ * `ResizeObserver`. Without these stubs a virtualized list renders nothing and
+ * the tests prove that nothing is nothing. Crude on purpose: the real numbers
+ * come from the benchmark, in a real browser.
  */
 declare global {
   /** Viewport height the stubbed `clientHeight` reports. Tests set it directly. */
@@ -24,19 +21,13 @@ globalThis.testViewportHeight = 800
 globalThis.testRowHeight = 20
 
 if (!('ResizeObserver' in globalThis)) {
-  // Nothing in a test ever resizes, so an observer that never fires is an
-  // accurate stand-in rather than a shortcut.
+  /* eslint-disable @typescript-eslint/no-empty-function -- nothing resizes in a test */
   globalThis.ResizeObserver = class {
-    observe(): void {
-      // jsdom never lays out, so nothing to report.
-    }
-    unobserve(): void {
-      // See observe.
-    }
-    disconnect(): void {
-      // See observe.
-    }
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
   }
+  /* eslint-enable @typescript-eslint/no-empty-function */
 }
 
 Object.defineProperty(HTMLElement.prototype, 'clientHeight', {

@@ -5,14 +5,8 @@ import type { ParsedDiff } from '../core/parse/types'
 import { DiffRow } from './DiffRow'
 import { FileHeaderRow, HunkHeaderRow, NoteRow } from './rows'
 
-/**
- * What each kind of row is assumed to measure before anyone looks.
- *
- * Only a starting point: every row that reaches the screen is measured and the
- * estimate replaced. They are here so the scrollbar is roughly right on the
- * first frame rather than settling visibly as the reader scrolls — and so that
- * a document of mostly file headers is not sized as though it were all lines.
- */
+/** Starting points only — every row that reaches the screen is measured. They
+ *  keep the scrollbar roughly right on the first frame. */
 const ESTIMATED_HEIGHT: Record<RowKind, number> = {
   [RowKind.FileHeader]: 37,
   [RowKind.Note]: 52,
@@ -20,7 +14,7 @@ const ESTIMATED_HEIGHT: Record<RowKind, number> = {
   [RowKind.Line]: 20,
 }
 
-/** Rendered beyond the viewport on each side, so small scrolls need no new rows. */
+/** Rendered beyond the viewport, so small scrolls need no new rows. */
 const OVERSCAN_PX = 600
 
 export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
@@ -36,8 +30,8 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
 
   const scrollerRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  // Cached so the scroll handler never reads layout; a read during scroll can
-  // force the browser to flush pending work at the worst possible moment.
+  // Cached: reading layout inside a scroll handler can force the browser to
+  // flush pending work at the worst possible moment.
   const viewportHeight = useRef(0)
 
   const [view, setView] = useState<VisibleWindow>(() => virtualizer.visible)
@@ -51,18 +45,13 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
   }, [virtualizer])
 
   /**
-   * Measure what was just rendered, then put the view back where it was.
+   * Measure what was rendered, then put the view back where it was.
    *
-   * This deliberately loops: measuring rows changes the layout, which can change
-   * which rows belong on screen, which renders different rows to measure. It
-   * settles rather than spinning because a height equal to its last value
-   * reports no change and the window then stops moving — so the effect runs
-   * again only when it has produced something new to look at, which is why the
-   * dependency is the window itself.
-   *
-   * It has to be a layout effect rather than an ordinary one: the scroll
-   * correction must land before the browser paints, or the reader sees exactly
-   * the jump it exists to prevent.
+   * This loops on purpose — measuring changes the layout, which can change which
+   * rows belong on screen. It settles because an unchanged height reports no
+   * change, which is why the dependency is the window itself. A layout effect
+   * rather than an ordinary one: the correction must land before the paint, or
+   * the reader sees the jump it exists to prevent.
    */
   useLayoutEffect(() => {
     const scroller = scrollerRef.current
@@ -75,9 +64,8 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
     for (let i = 0; i < children.length; i += 1) {
       const element = children[i]
       if (element === undefined) continue
-      // getBoundingClientRect, not offsetHeight: the latter rounds to whole
-      // pixels, and rounding a hundred thousand rows drifts the document by
-      // more than a screenful.
+      // Not offsetHeight: it rounds to whole pixels, and rounding a hundred
+      // thousand rows drifts the document by more than a screenful.
       virtualizer.measure(view.first + i, element.getBoundingClientRect().height)
     }
 
@@ -117,11 +105,11 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
       className="h-full overflow-auto bg-neutral-950 font-mono text-xs"
       data-testid="diff-scroller"
     >
-      {/* Holds the scrollbar at the size of the whole document, so the reader
-          can scroll to a row that does not exist in the DOM yet. */}
+      {/* Sized for the whole document, so the reader can scroll to rows that
+          are not in the DOM yet. */}
       <div style={{ height: view.totalHeight }} className="relative">
-        {/* One transform for the whole block, rather than positioning every row.
-            Rows stay in normal flow, which is what lets them be measured. */}
+        {/* One transform for the block: rows stay in normal flow, which is
+            what lets them be measured. */}
         <div ref={listRef} data-rows style={{ transform: `translateY(${view.offsetTop}px)` }}>
           {visibleRows}
         </div>

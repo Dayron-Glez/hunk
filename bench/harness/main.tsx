@@ -4,13 +4,9 @@ import { parseUnifiedDiff } from '../../src/core/parse/unified'
 import '../../src/index.css'
 
 /**
- * The page the benchmark drives.
- *
- * It renders the same components the application does, but without the picker
- * around them: the diff arrives from the URL, so a measurement starts at the
- * moment the source is in hand and is not polluted by the cost of getting it
- * there. Everything it learns is published on `window.__bench` for the runner
- * in `bench/run.mjs` to read.
+ * The page the benchmark drives. Same components as the application, without
+ * the picker: the diff arrives from the URL, so the clock starts once the
+ * source is in hand. Results are published on `window.__bench`.
  */
 
 interface BenchTimings {
@@ -24,11 +20,8 @@ interface BenchTimings {
 }
 
 interface ScrollReport {
-  /**
-   * Whether the long-animation-frame observer proved it works before the
-   * measurement. When false, the blocking figures below mean nothing and a zero
-   * in them is the absence of an instrument, not the absence of a problem.
-   */
+  /** Whether the observer proved it works first. When false, a zero below is
+   *  the absence of an instrument, not the absence of a problem. */
   readonly blockingMeasurable: boolean
   /** Total time the main thread was blocked while scrolling. */
   readonly blockingMs: number
@@ -75,16 +68,12 @@ const lines = diff.files.reduce(
 )
 
 /**
- * Waiting for React to commit is not the same as waiting for the browser to
- * show anything, and the number that matters is the second one. Poll frames
- * until rows are in the document, then let one more frame go by so the paint
- * that puts them on screen is included.
+ * React committing is not the browser showing anything, and the second is what
+ * matters: poll until rows are in the document, then let one more frame pass so
+ * the paint is included.
  *
- * The condition is "the reader can see the diff", not "every row exists".
- * Those were the same thing before virtualization and are not any more, which
- * is the entire point of the change — but it does mean a number from before
- * and a number from after are answering slightly different questions, and
- * bench/README.md says so.
+ * The condition is "the reader can see the diff", not "every row exists" —
+ * different questions since virtualization, as bench/README.md notes.
  */
 await new Promise<void>((resolve) => {
   const tick = (): void => {
@@ -113,25 +102,19 @@ window.__bench.timings = {
 }
 
 /**
- * How well the page scrolls, measured as main-thread blocking rather than as
- * frames per second.
+ * Main-thread blocking, not frames per second.
  *
- * Counting `requestAnimationFrame` callbacks was the obvious approach and it is
- * wrong here: headless Chromium drives that callback from a fixed 60 Hz timer
- * that is decoupled from the compositor, so it reports a flat 60 whether the
- * document holds a thousand nodes or a million. It counts frames the browser
- * *scheduled*, not frames it *presented*, and publishing that number would be
- * publishing a constant.
+ * Counting `requestAnimationFrame` was the obvious approach and is wrong here:
+ * headless Chromium drives it from a fixed 60 Hz timer decoupled from the
+ * compositor, so it reports a flat 60 from a thousand nodes to a million —
+ * frames *scheduled*, not *presented*.
  *
- * Blocking is measurable without a compositor and is the thing that actually
- * makes scrolling feel broken: while the main thread is busy, nothing responds.
- * Two independent views of it are taken, because neither is perfect alone —
- * long animation frames attribute the work, and event-loop lag catches blocking
- * that never made it into a frame at all.
+ * Blocking needs no compositor and is what makes scrolling feel broken. Two
+ * views of it: long animation frames attribute the work, event-loop lag catches
+ * blocking that never reached a frame.
  */
 async function measureScroll(): Promise<ScrollReport> {
-  // The diff scrolls inside its own element now, not with the page, so the
-  // window's scroll position is not the one that moves anything.
+  // The diff scrolls inside its own element, not with the page.
   const scroller = document.querySelector('[data-testid="diff-scroller"]')
   if (scroller === null) throw new Error('no scroller to measure')
 
@@ -192,13 +175,9 @@ async function measureScroll(): Promise<ScrollReport> {
 }
 
 /**
- * Block the main thread on purpose and check the observer noticed.
- *
- * A metric that reports zero when the instrument is missing is worse than one
- * that reports nothing, because zero looks like an answer. The frames-per-second
- * figure this file used to publish was exactly that: a constant that survived a
- * thousandfold change in document size. Nothing gets published here now without
- * first proving it can move.
+ * Block the main thread on purpose and check the observer noticed. A zero from
+ * a missing instrument looks like an answer, which is worse than no answer —
+ * nothing is published here without first proving it can move.
  */
 async function proveObserverWorks(sink: number[]): Promise<boolean> {
   const before = sink.length
