@@ -55,6 +55,38 @@ export class HeightTree {
     this.highestBit = bit
   }
 
+  /**
+   * Build from a height per row rather than one estimate for all of them.
+   *
+   * Rows are not interchangeable — a file header is about twice a line — and the
+   * kinds are known before anything is measured. Seeding with that costs the
+   * same single pass and keeps the scrollbar honest from the first frame,
+   * instead of having it creep as rows are measured and the estimate is found
+   * to have been wrong all along.
+   */
+  static fromHeights(heights: ArrayLike<number>): HeightTree {
+    const tree = new HeightTree(heights.length, 0)
+    let total = 0
+
+    for (let i = 0; i < heights.length; i += 1) {
+      const height = heights[i]!
+      if (!Number.isFinite(height) || height < 0) {
+        throw new RangeError(`height at ${i} must be finite and non-negative, got ${height}`)
+      }
+      tree.heights[i] = height
+      total += height
+    }
+
+    for (let i = 1; i <= heights.length; i += 1) {
+      tree.tree[i] = tree.tree[i]! + tree.heights[i - 1]!
+      const parent = i + (i & -i)
+      if (parent <= heights.length) tree.tree[parent] = tree.tree[parent]! + tree.tree[i]!
+    }
+
+    tree.total = total
+    return tree
+  }
+
   get length(): number {
     return this.count
   }
