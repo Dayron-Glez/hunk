@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { HighlightStore } from '../core/highlight/store'
-import type { Segment } from '../core/highlight/segments'
-import { RowIndex, RowKind } from '../core/layout/rowIndex'
+import { RowIndex, RowKind, type LayoutMode } from '../core/layout/rowIndex'
 import { Virtualizer, type VisibleWindow } from '../core/layout/virtualizer'
 import type { ParsedDiff } from '../core/parse/types'
 import { HighlightClient } from '../workers/highlightClient'
-import { DiffRow } from './DiffRow'
+import { DiffRow, SplitDiffRow } from './DiffRow'
 import { FileHeaderRow, HunkHeaderRow, NoteRow } from './rows'
 
 /** Starting points only — every row that reaches the screen is measured. They
@@ -20,8 +19,17 @@ const ESTIMATED_HEIGHT: Record<RowKind, number> = {
 /** Rendered beyond the viewport, so small scrolls need no new rows. */
 const OVERSCAN_PX = 600
 
-export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
-  const rows = useMemo(() => new RowIndex(diff), [diff])
+export function VirtualDiff({
+  diff,
+  mode = 'unified',
+}: {
+  readonly diff: ParsedDiff
+  readonly mode?: LayoutMode
+}) {
+  // Rebuilt on a mode change rather than kept for both: the second index costs
+  // 10 ms on the kernel commit, and holding it costs 1 MB for as long as the
+  // reader stays in the mode that does not use it.
+  const rows = useMemo(() => new RowIndex(diff, mode), [diff, mode])
 
   const virtualizer = useMemo(() => {
     const estimates = new Float64Array(rows.length)
@@ -38,6 +46,17 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
   const viewportHeight = useRef(0)
 
   const [view, setView] = useState<VisibleWindow>(() => virtualizer.visible)
+  // Which virtualizer `view` describes. Switching layout builds a new one over
+  // a shorter document, and a window left over from the longer one asks for
+  // rows that no longer exist. Reset here rather than in an effect: an effect
+  // runs after the render that would already have read past the end.
+  const [described, setDescribed] = useState(virtualizer)
+  let shown = view
+  if (described !== virtualizer) {
+    shown = virtualizer.visible
+    setDescribed(virtualizer)
+    setView(shown)
+  }
   // Bumped when colours land, which is the only thing that makes this render
   // without the window having moved.
   const [coloured, setColoured] = useState(0)
@@ -120,10 +139,8 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
   }, [refresh])
 
   const visibleRows = []
-  for (let row = view.first; row <= view.last; row += 1) {
-    visibleRows.push(
-      <Row key={row} rows={rows} row={row} segments={highlights.store.segmentsFor(row)} />,
-    )
+  for (let row = shown.first; row <= shown.last; row += 1) {
+    visibleRows.push(<Row key={row} rows={rows} row={row} store={highlights.store} />)
   }
   void coloured
 
@@ -136,10 +153,10 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
     >
       {/* Sized for the whole document, so the reader can scroll to rows that
           are not in the DOM yet. */}
-      <div style={{ height: view.totalHeight }} className="relative">
+      <div style={{ height: shown.totalHeight }} className="relative">
         {/* One transform for the block: rows stay in normal flow, which is
             what lets them be measured. */}
-        <div ref={listRef} data-rows style={{ transform: `translateY(${view.offsetTop}px)` }}>
+        <div ref={listRef} data-rows style={{ transform: `translateY(${shown.offsetTop}px)` }}>
           {visibleRows}
         </div>
       </div>
@@ -150,11 +167,11 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
 function Row({
   rows,
   row,
-  segments,
+  store,
 }: {
   readonly rows: RowIndex
   readonly row: number
-  readonly segments: readonly Segment[] | null
+  readonly store: HighlightStore
 }) {
   switch (rows.kindAt(row)) {
     case RowKind.FileHeader:
@@ -164,7 +181,16 @@ function Row({
     case RowKind.HunkHeader:
       return <HunkHeaderRow hunk={rows.hunkAt(row)!} />
     default:
-      return <DiffRow line={rows.lineAt(row)!} segments={segments} />
+      return rows.mode === 'split' ? (
+        <SplitDiffRow
+          oldLine={rows.cellAt(row, 'old')}
+          newLine={rows.cellAt(row, 'new')}
+          oldSegments={store.segmentsFor(row, 'old')}
+          newSegments={store.segmentsFor(row, 'new')}
+        />
+      ) : (
+        <DiffRow line={rows.lineAt(row)!} segments={store.segmentsFor(row)} />
+      )
   }
 }
 

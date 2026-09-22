@@ -115,3 +115,70 @@ describe('the empty case', () => {
     expect(list().childElementCount).toBe(0)
   })
 })
+
+describe('two columns', () => {
+  const rowsOf = (): HTMLElement[] => Array.from(list().children) as HTMLElement[]
+  const cellsOf = (row: HTMLElement) => ({
+    left: row.children[0]?.textContent ?? '',
+    right: row.children[1]?.textContent ?? '',
+  })
+
+  it('draws a replacement as one row with both versions on it', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+
+    // The one edited line of that pull request, before and after.
+    const after = '[\\w.][^,]+'
+    const before = '\\w[^,]+'
+
+    const paired = rowsOf().find((row) => cellsOf(row).right.includes(after))
+    expect(paired).toBeDefined()
+    expect(cellsOf(paired!).left).toContain(before)
+  })
+
+  it('needs fewer rows than the unified view of the same diff', () => {
+    const diff = diffOf(BIG)
+    expect(new RowIndex(diff, 'split').length).toBeLessThan(new RowIndex(diff).length)
+  })
+
+  it('still windows rather than rendering the whole document', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} mode="split" />)
+    expect(list().childElementCount).toBeLessThan(100)
+    expect(list().childElementCount).toBeGreaterThan(0)
+  })
+
+  it('leaves a blank cell opposite a line with no counterpart', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23378-new-files.diff')} mode="split" />)
+
+    // A new file is all insertions, so every line of it has an empty left cell
+    // rather than pulling the right column up by one.
+    const gapped = rowsOf().filter((row) => {
+      const cells = cellsOf(row)
+      return row.childElementCount === 2 && cells.left === '' && cells.right !== ''
+    })
+    expect(gapped.length).toBeGreaterThan(10)
+  })
+
+  it('numbers the left cell from the old file and the right from the new', () => {
+    globalThis.testViewportHeight = 100_000
+    const diff = diffOf('vite-pr-23378-new-files.diff')
+    render(<VirtualDiff diff={diff} mode="split" />)
+
+    // After a block of additions the two files no longer agree on line
+    // numbers, which is the case a shared gutter would get wrong.
+    const rows = new RowIndex(diff, 'split')
+    let checked = 0
+    for (let row = 0; row < rows.length; row += 1) {
+      const left = rows.cellAt(row, 'old')
+      const right = rows.cellAt(row, 'new')
+      if (left === null || right === null) continue
+      if (left.oldNumber === right.newNumber) continue
+      const drawn = rowsOf()[row]
+      expect(drawn?.children[0]?.textContent).toContain(String(left.oldNumber))
+      expect(drawn?.children[1]?.textContent).toContain(String(right.newNumber))
+      checked += 1
+    }
+    expect(checked).toBeGreaterThan(0)
+  })
+})

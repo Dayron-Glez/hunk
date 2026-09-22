@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import { DiffView } from '../../src/components/DiffView'
+import type { LayoutMode } from '../../src/core/layout/rowIndex'
 import { parseUnifiedDiff } from '../../src/core/parse/unified'
 import '../../src/index.css'
 
@@ -17,6 +18,7 @@ interface BenchTimings {
   readonly files: number
   readonly lines: number
   readonly bytes: number
+  readonly mode: LayoutMode
 }
 
 interface ScrollReport {
@@ -48,6 +50,10 @@ const params = new URLSearchParams(window.location.search)
 const caseName = params.get('case')
 if (caseName === null) throw new Error('bench harness needs a ?case= parameter')
 
+// Rendered in the layout from the start rather than switched into it: a first
+// paint measured after a toggle would be measuring the toggle.
+const mode: LayoutMode = params.get('mode') === 'split' ? 'split' : 'unified'
+
 window.__bench = { timings: null, measureScroll }
 
 const startedAt = performance.now()
@@ -60,7 +66,7 @@ const parsedAt = performance.now()
 const container = document.getElementById('root')
 if (container === null) throw new Error('#root not found')
 
-createRoot(container).render(<DiffView diff={diff} />)
+createRoot(container).render(<DiffView diff={diff} initialMode={mode} />)
 
 const lines = diff.files.reduce(
   (total, file) => total + file.hunks.reduce((sum, hunk) => sum + hunk.lines.length, 0),
@@ -99,6 +105,7 @@ window.__bench.timings = {
   files: diff.files.length,
   lines,
   bytes: source.length,
+  mode,
 }
 
 /**

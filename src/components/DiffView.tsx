@@ -1,7 +1,24 @@
+import { useState } from 'react'
+import type { LayoutMode } from '../core/layout/rowIndex'
 import type { ParsedDiff } from '../core/parse/types'
 import { VirtualDiff } from './VirtualDiff'
 
-export function DiffView({ diff }: { readonly diff: ParsedDiff }) {
+const MODES: readonly { readonly mode: LayoutMode; readonly label: string }[] = [
+  { mode: 'unified', label: 'Unified' },
+  { mode: 'split', label: 'Split' },
+]
+
+export function DiffView({
+  diff,
+  initialMode = 'unified',
+}: {
+  readonly diff: ParsedDiff
+  /** Which layout to open in. The benchmark uses it to measure a first paint
+   *  in either one; a reader's own choice lives in the state below. */
+  readonly initialMode?: LayoutMode
+}) {
+  const [mode, setMode] = useState<LayoutMode>(initialMode)
+
   if (diff.files.length === 0) {
     return <p className="p-6 text-sm text-neutral-500">Nothing to show — this diff is empty.</p>
   }
@@ -14,6 +31,26 @@ export function DiffView({ diff }: { readonly diff: ParsedDiff }) {
         </span>
         <span className="text-emerald-400">+{diff.additions}</span>
         <span className="text-rose-400">-{diff.deletions}</span>
+
+        <div className="ml-auto flex rounded border border-neutral-800" role="group">
+          {MODES.map((option) => (
+            <button
+              key={option.mode}
+              type="button"
+              onClick={() => {
+                setMode(option.mode)
+              }}
+              aria-pressed={mode === option.mode}
+              className={`px-2 py-0.5 first:rounded-l last:rounded-r ${
+                mode === option.mode
+                  ? 'bg-neutral-800 text-neutral-100'
+                  : 'text-neutral-500 hover:text-neutral-300'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {diff.warnings.length > 0 ? (
@@ -27,7 +64,7 @@ export function DiffView({ diff }: { readonly diff: ParsedDiff }) {
       ) : null}
 
       <div className="min-h-0 flex-1 border-t border-neutral-800">
-        <VirtualDiff diff={diff} />
+        <VirtualDiff diff={diff} mode={mode} />
       </div>
     </div>
   )

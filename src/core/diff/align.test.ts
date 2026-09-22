@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFixture } from '../../../tests/fixtures'
 import { parseUnifiedDiff } from '../parse/unified'
 import type { DiffLine } from '../parse/types'
-import { GHOST, alignHunk } from './align'
+import { GHOST, alignHunk, alignedRowCount } from './align'
 
 const lines = (...kinds: DiffLine['kind'][]): DiffLine[] =>
   kinds.map((kind, i) => ({
@@ -82,6 +82,26 @@ describe('gaps', () => {
   })
 })
 
+describe('counting the rows before building them', () => {
+  const shapes: DiffLine['kind'][][] = [
+    [],
+    ['context'],
+    ['delete', 'insert'],
+    ['delete', 'delete', 'insert', 'insert'],
+    ['delete', 'delete', 'delete', 'insert'],
+    ['delete', 'insert', 'insert', 'insert'],
+    ['delete', 'context', 'insert'],
+    ['insert', 'delete'],
+  ]
+
+  // The index sizes its typed arrays from the count, so a count that disagrees
+  // with the rows would leave the tail of the diff pointing at nothing.
+  it.each(shapes)('agrees with the rows themselves: %s', (...kinds) => {
+    const source = lines(...kinds)
+    expect(alignedRowCount(source)).toBe(alignHunk(source).length)
+  })
+})
+
 /**
  * What makes the two columns readable: every line appears exactly once, on its
  * own side, in the order the hunk gave it. A line shown twice or dropped is a
@@ -126,6 +146,14 @@ describe.each([
         for (const row of alignHunk(hunk.lines)) {
           expect(row.old === GHOST && row.new === GHOST).toBe(false)
         }
+      }
+    }
+  })
+
+  it('is counted correctly without being built', () => {
+    for (const file of diff.files) {
+      for (const hunk of file.hunks) {
+        expect(alignedRowCount(hunk.lines)).toBe(alignHunk(hunk.lines).length)
       }
     }
   })

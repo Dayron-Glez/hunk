@@ -1,6 +1,6 @@
 import { pairChangedLines } from '../diff/pairLines'
 import { wordDiff, type Range } from '../diff/wordDiff'
-import type { RowIndex } from '../layout/rowIndex'
+import type { Column, RowIndex } from '../layout/rowIndex'
 import type { DiffLine } from '../parse/types'
 import { languageOf } from './language'
 import { mergeSegments, type Segment } from './segments'
@@ -87,17 +87,25 @@ export class HighlightStore {
     }
   }
 
-  /** Spans for a row, or null while it is unhighlighted — plain text is fine. */
-  spansFor(row: number): Span[] | null {
+  /**
+   * Spans for a row, or null while it is unhighlighted — plain text is fine.
+   *
+   * `column` picks which of a two-column row's cells is being asked about; a
+   * unified row has one cell and answers without it. It is not the same thing
+   * as which document the colours come from: a deletion sitting in the left
+   * column and a deletion in a unified row both read from the old side, and
+   * the line's own kind is what says so.
+   */
+  spansFor(row: number, column?: Column): Span[] | null {
     const key = this.keyOf(row)
     if (key === -1) return null
 
     const entry = this.entries.get(key)
     if (!entry?.done) return null
 
-    const line = this.rows.lineAt(row)
-    const lineIndex = this.rows.lineIndexAt(row)
-    if (line === null || lineIndex === -1) return null
+    const lineIndex = this.indexOf(row, column)
+    const line = lineIndex === -1 ? null : (this.rows.hunkAt(row)?.lines[lineIndex] ?? null)
+    if (line === null) return null
 
     const side = sideForLine(line.kind, entry.sides)
     if (side === null) return null
@@ -115,18 +123,18 @@ export class HighlightStore {
    * Everything needed to draw one row: its colours and the parts of it that
    * changed, cut so each piece has one of each. Null means plain text.
    */
-  segmentsFor(row: number): Segment[] | null {
+  segmentsFor(row: number, column?: Column): Segment[] | null {
     const key = this.keyOf(row)
     if (key === -1) return null
 
     const entry = this.entries.get(key)
     if (entry == null) return null
 
-    const line = this.rows.lineAt(row)
-    const lineIndex = this.rows.lineIndexAt(row)
-    if (line === null || lineIndex === -1) return null
+    const lineIndex = this.indexOf(row, column)
+    const line = lineIndex === -1 ? null : (this.rows.hunkAt(row)?.lines[lineIndex] ?? null)
+    if (line === null) return null
 
-    const spans = this.spansFor(row)
+    const spans = this.spansFor(row, column)
     const ranges = changesFor(entry, lineIndex)
     if (spans === null && ranges.length === 0) return null
 
@@ -143,6 +151,11 @@ export class HighlightStore {
     let total = 0
     for (const entry of this.entries.values()) total += entry?.ranges.size ?? 0
     return total
+  }
+
+  /** The line a question is about: one named cell, or whatever the row shows. */
+  private indexOf(row: number, column: Column | undefined): number {
+    return column === undefined ? this.rows.lineIndexAt(row) : this.rows.cellIndexAt(row, column)
   }
 
   private keyOf(row: number): number {

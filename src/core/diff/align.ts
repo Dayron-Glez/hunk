@@ -44,3 +44,18 @@ export function alignHunk(lines: readonly DiffLine[]): AlignedRow[] {
 
   return rows
 }
+
+/**
+ * How many rows `alignHunk` will produce, without building them.
+ *
+ * The row index has to size its typed arrays before it can fill them, and
+ * aligning every hunk twice to find that out costs 9 ms on the kernel commit.
+ * Each pair collapses two lines into one row and nothing else does, so the
+ * count falls out of the pairing alone — `pairChangedLines` records both
+ * directions, hence the halving. A test holds this equal to `alignHunk` across
+ * the whole corpus, because a formula that drifts from the thing it predicts
+ * would corrupt the index rather than fail loudly.
+ */
+export function alignedRowCount(lines: readonly DiffLine[]): number {
+  return lines.length - pairChangedLines(lines).size / 2
+}
