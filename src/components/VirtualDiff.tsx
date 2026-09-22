@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { HighlightStore } from '../core/highlight/store'
-import type { Span } from '../core/highlight/tokens'
+import type { Segment } from '../core/highlight/segments'
 import { RowIndex, RowKind } from '../core/layout/rowIndex'
 import { Virtualizer, type VisibleWindow } from '../core/layout/virtualizer'
 import type { ParsedDiff } from '../core/parse/types'
@@ -121,7 +121,9 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
 
   const visibleRows = []
   for (let row = view.first; row <= view.last; row += 1) {
-    visibleRows.push(<Row key={row} rows={rows} row={row} spans={highlights.store.spansFor(row)} />)
+    visibleRows.push(
+      <Row key={row} rows={rows} row={row} segments={highlights.store.segmentsFor(row)} />,
+    )
   }
   void coloured
 
@@ -148,11 +150,11 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
 function Row({
   rows,
   row,
-  spans,
+  segments,
 }: {
   readonly rows: RowIndex
   readonly row: number
-  readonly spans: readonly Span[] | null
+  readonly segments: readonly Segment[] | null
 }) {
   switch (rows.kindAt(row)) {
     case RowKind.FileHeader:
@@ -162,7 +164,7 @@ function Row({
     case RowKind.HunkHeader:
       return <HunkHeaderRow hunk={rows.hunkAt(row)!} />
     default:
-      return <DiffRow line={rows.lineAt(row)!} spans={spans} />
+      return <DiffRow line={rows.lineAt(row)!} segments={segments} />
   }
 }
 
