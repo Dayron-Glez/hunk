@@ -1,4 +1,6 @@
-import { useState, type DragEvent } from 'react'
+import { useState, type DragEvent, type FormEvent } from 'react'
+import { fetchPullRequestDiff, parsePullRequestUrl, type LoadFailure } from '../core/source/github'
+import { describeFailure } from './loadFailure'
 
 const samples = import.meta.glob<string>('../../fixtures/github/*.diff', {
   query: '?raw',
@@ -22,6 +24,28 @@ export function SourcePicker({ onLoad }: { readonly onLoad: (source: string) => 
   const [pasted, setPasted] = useState('')
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
+  const [url, setUrl] = useState('')
+  const [fetching, setFetching] = useState(false)
+  const [failure, setFailure] = useState<LoadFailure | null>(null)
+
+  const openPullRequest = (event: FormEvent): void => {
+    event.preventDefault()
+    if (fetching) return
+
+    const ref = parsePullRequestUrl(url)
+    if (ref === null) {
+      setFailure({ kind: 'unreadable', input: url })
+      return
+    }
+
+    setFailure(null)
+    setFetching(true)
+    void fetchPullRequestDiff(ref).then((result) => {
+      setFetching(false)
+      if (result.ok) onLoad(result.diff)
+      else setFailure(result.failure)
+    })
+  }
 
   const handleDrop = (event: DragEvent<HTMLDivElement>): void => {
     event.preventDefault()
@@ -48,6 +72,46 @@ export function SourcePicker({ onLoad }: { readonly onLoad: (source: string) => 
         <p className="text-sm text-neutral-400">a high-performance diff viewer</p>
       </div>
 
+      <form onSubmit={openPullRequest} className="flex flex-col gap-2">
+        <label htmlFor="pr-url" className="text-sm text-neutral-400">
+          Open a pull request
+        </label>
+        <div className="flex gap-2">
+          <input
+            id="pr-url"
+            type="text"
+            inputMode="url"
+            spellCheck={false}
+            value={url}
+            onChange={(event) => {
+              setUrl(event.target.value)
+              setFailure(null)
+            }}
+            placeholder="github.com/owner/repo/pull/123"
+            aria-describedby={failure === null ? 'pr-limit' : 'pr-failure'}
+            aria-invalid={failure !== null}
+            className="min-w-0 flex-1 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-1.5 font-mono text-xs text-neutral-200 outline-none placeholder:text-neutral-400 focus:border-sky-500"
+          />
+          <button
+            type="submit"
+            disabled={url.trim() === '' || fetching}
+            className="shrink-0 rounded-md bg-sky-700 px-3 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {fetching ? 'Opening…' : 'Open'}
+          </button>
+        </div>
+        {failure === null ? (
+          <p id="pr-limit" className="text-xs text-neutral-400">
+            Public repositories only, through GitHub&rsquo;s API — sixty requests an hour without an
+            account.
+          </p>
+        ) : (
+          <p id="pr-failure" role="alert" className="text-xs text-amber-200/90">
+            {describeFailure(failure)}
+          </p>
+        )}
+      </form>
+
       <div
         onDragOver={(event) => {
           event.preventDefault()
@@ -69,7 +133,7 @@ export function SourcePicker({ onLoad }: { readonly onLoad: (source: string) => 
 
       <div className="flex flex-col gap-2">
         <label htmlFor="paste" className="text-sm text-neutral-400">
-          …or paste one
+          …or paste a diff
         </label>
         <textarea
           id="paste"
