@@ -34,7 +34,10 @@ export function DiffRow({
   readonly segments: readonly Segment[] | null
 }) {
   return (
-    <div className={`flex min-h-5 w-max min-w-full leading-5 ${ROW_STYLES[line.kind]}`}>
+    <div
+      role="gridcell"
+      className={`flex min-h-5 w-max min-w-full leading-5 ${ROW_STYLES[line.kind]}`}
+    >
       {/* Sticky so the numbers stay put while a long line scrolls, and unselectable
           so copying a block of the diff yields code rather than code plus gutters. */}
       <div
@@ -81,7 +84,8 @@ export function SplitDiffRow({
   readonly newSegments: readonly Segment[] | null
 }) {
   return (
-    <div className="flex min-h-5 leading-5">
+    // Presentational: the two cells below are what the grid sees as cells.
+    <div role="presentation" className="flex min-h-5 leading-5">
       <SplitCell line={oldLine} segments={oldSegments} column="old" />
       <SplitCell line={newLine} segments={newSegments} column="new" />
     </div>
@@ -109,11 +113,11 @@ function SplitCell({
   const edge = column === 'old' ? 'border-r border-neutral-800' : ''
 
   if (line === null) {
-    return <div className={`w-1/2 shrink-0 bg-neutral-900/40 ${edge}`} aria-hidden />
+    return <div role="gridcell" className={`w-1/2 shrink-0 bg-neutral-900/40 ${edge}`} />
   }
 
   return (
-    <div className={`flex w-1/2 shrink-0 ${ROW_STYLES[line.kind]} ${edge}`}>
+    <div role="gridcell" className={`flex w-1/2 shrink-0 ${ROW_STYLES[line.kind]} ${edge}`}>
       <span
         className="w-12 shrink-0 pr-2 text-right text-neutral-600 tabular-nums select-none"
         aria-hidden

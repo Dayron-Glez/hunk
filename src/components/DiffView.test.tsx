@@ -105,8 +105,9 @@ describe('choosing a layout', () => {
     const rows = Array.from(
       screen.getByTestId('diff-scroller').querySelector('[data-rows]')!.children,
     ) as HTMLElement[]
-    const paired = rows.find((row) => row.children[0]?.textContent?.includes('bravo') === true)
-    expect(paired?.children[1]?.textContent).toContain('BRAVO')
+    const cells = (row: HTMLElement) => row.querySelectorAll('[role="gridcell"]')
+    const paired = rows.find((row) => cells(row)[0]?.textContent?.includes('bravo') === true)
+    expect(cells(paired!)[1]?.textContent).toContain('BRAVO')
   })
 
   it('goes back to one column', () => {

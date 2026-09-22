@@ -1,7 +1,16 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 import { HighlightStore } from '../core/highlight/store'
 import { EXPAND_BY, Folding, type HunkRef } from '../core/layout/folding'
 import { MeasuredHeights } from '../core/layout/measuredHeights'
+import { moveFrom, startingPosition, type Move } from '../core/layout/navigation'
 import { RowIndex, RowKind, type LayoutMode } from '../core/layout/rowIndex'
 import { Virtualizer, type VisibleWindow } from '../core/layout/virtualizer'
 import type { ParsedDiff } from '../core/parse/types'
@@ -20,6 +29,27 @@ const ESTIMATED_HEIGHT: Record<RowKind, number> = {
 
 /** Rendered beyond the viewport, so small scrolls need no new rows. */
 const OVERSCAN_PX = 600
+
+/** What the keys do. The moves themselves live in core/layout/navigation. */
+const MOVES: Readonly<Record<string, Move>> = {
+  ArrowDown: 'next-row',
+  j: 'next-row',
+  ArrowUp: 'previous-row',
+  k: 'previous-row',
+  n: 'next-hunk',
+  p: 'previous-hunk',
+  ']': 'next-file',
+  '[': 'previous-file',
+  PageDown: 'next-page',
+  PageUp: 'previous-page',
+  Home: 'first',
+  End: 'last',
+}
+
+const ACTIVE_ROW = 'outline outline-1 -outline-offset-1 outline-sky-400/80'
+
+/** Stable per position, which is what `aria-activedescendant` needs to name. */
+const rowElementId = (position: number): string => `diff-row-${position}`
 
 /** Where the reader was looking, so a fold can put them back there. */
 interface Anchor {
@@ -76,6 +106,10 @@ export function VirtualDiff({
   const [viewportHeight, setViewportHeight] = useState(0)
   /** The virtualizer whose restore has already reached the DOM. */
   const restored = useRef(virtualizer)
+
+  // The row the keyboard is on, by row of the full index so it survives a
+  // fold. Null until the reader presses a key.
+  const [activeRow, setActiveRow] = useState<number | null>(null)
 
   const [view, setView] = useState<VisibleWindow>(() => virtualizer.visible)
   // Which virtualizer `view` describes. A fold or a layout switch builds a new
@@ -171,6 +205,70 @@ export function VirtualDiff({
     [folding, refold],
   )
 
+  /** Scroll only as far as it takes to bring a position into view. */
+  const reveal = useCallback(
+    (position: number) => {
+      const scroller = scrollerRef.current
+      if (scroller === null) return
+      const top = virtualizer.offsetOf(position)
+      const bottom = top + virtualizer.heightOf(position)
+      if (top < scroller.scrollTop) scroller.scrollTop = top
+      else if (bottom > scroller.scrollTop + viewportHeight) {
+        scroller.scrollTop = bottom - viewportHeight
+      }
+      refresh()
+    },
+    [virtualizer, viewportHeight, refresh],
+  )
+
+  const onKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      // Let the reader use the fold buttons and the layout toggle normally.
+      if (event.target !== event.currentTarget) return
+      if (event.altKey || event.ctrlKey || event.metaKey) return
+
+      const from = startingPosition(
+        activeRow === null ? null : folding.positionAt(activeRow),
+        view.first,
+        view.last,
+      )
+
+      if (event.key === 'Enter' || event.key === ' ') {
+        const row = folding.rowAt(from)
+        if (row === -1) return
+        const kind = rows.kindAt(row)
+        if (kind === RowKind.FileHeader) toggleFile(rows.fileIndexAt(row))
+        else if (kind === RowKind.HunkHeader) {
+          toggleHunk({ file: rows.fileIndexAt(row), hunk: rows.hunkIndexAt(row) })
+        } else return
+        event.preventDefault()
+        setActiveRow(row)
+        return
+      }
+
+      const move = MOVES[event.key]
+      if (move === undefined) return
+      event.preventDefault()
+
+      // A page is what the viewport holds, which only this component knows.
+      const pageRows = Math.max(1, Math.round(viewportHeight / 20))
+      const to = moveFrom(rows, folding, from, move, pageRows)
+      setActiveRow(folding.rowAt(to))
+      reveal(to)
+    },
+    [
+      activeRow,
+      folding,
+      rows,
+      view.first,
+      view.last,
+      viewportHeight,
+      reveal,
+      toggleFile,
+      toggleHunk,
+    ],
+  )
+
   /**
    * Measure what was rendered, then put the view back where it was.
    *
@@ -231,44 +329,46 @@ export function VirtualDiff({
     }
   }, [refresh])
 
+  const activePosition = activeRow === null ? -1 : folding.positionAt(activeRow)
+
   const visibleRows = []
   for (let position = shown.first; position <= shown.last; position += 1) {
     const row = folding.rowAt(position)
     if (row === -1) continue
 
-    const drawn = (
-      <Row
-        rows={rows}
-        row={row}
-        folding={folding}
-        store={highlights.store}
-        onToggleFile={toggleFile}
-        onToggleHunk={toggleHunk}
-      />
-    )
-
     const hidden = folding.hiddenAfter(position)
-    if (hidden === 0) {
-      visibleRows.push(<Fragment key={row}>{drawn}</Fragment>)
-      continue
-    }
-
-    // The expander shares its position's element, so the height the
-    // virtualizer measures covers both and the arithmetic stays one row deep.
     const ref = { file: rows.fileIndexAt(row), hunk: rows.hunkIndexAt(row) }
+
+    // One wrapper per position, and the expander shares it, so the height the
+    // virtualizer measures covers both and the arithmetic stays one row deep.
     visibleRows.push(
-      <div key={row}>
-        {drawn}
-        <ExpanderRow
-          hidden={hidden}
-          chunk={EXPAND_BY}
-          onExpand={() => {
-            expandHunk(ref)
-          }}
-          onExpandAll={() => {
-            expandHunkFully(ref)
-          }}
+      <div
+        key={row}
+        id={rowElementId(position)}
+        role="row"
+        aria-rowindex={position + 1}
+        className={position === activePosition ? ACTIVE_ROW : undefined}
+      >
+        <Row
+          rows={rows}
+          row={row}
+          folding={folding}
+          store={highlights.store}
+          onToggleFile={toggleFile}
+          onToggleHunk={toggleHunk}
         />
+        {hidden === 0 ? null : (
+          <ExpanderRow
+            hidden={hidden}
+            chunk={EXPAND_BY}
+            onExpand={() => {
+              expandHunk(ref)
+            }}
+            onExpandAll={() => {
+              expandHunkFully(ref)
+            }}
+          />
+        )}
       </div>,
     )
   }
@@ -278,15 +378,34 @@ export function VirtualDiff({
     <div
       ref={scrollerRef}
       onScroll={refresh}
-      className="h-full overflow-auto bg-neutral-950 font-mono text-xs"
+      onKeyDown={onKeyDown}
+      // One tab stop for the whole diff, with the active row named rather than
+      // focused: a row the reader has scrolled past is not in the document to
+      // receive focus, and `aria-rowcount` is how a grid says how many rows it
+      // has when most of them are not there.
+      role="grid"
+      tabIndex={0}
+      aria-label="Diff"
+      aria-rowcount={folding.length}
+      aria-activedescendant={
+        activePosition >= shown.first && activePosition <= shown.last
+          ? rowElementId(activePosition)
+          : undefined
+      }
+      className="h-full overflow-auto bg-neutral-950 font-mono text-xs focus:outline-none"
       data-testid="diff-scroller"
     >
       {/* Sized for the whole document, so the reader can scroll to rows that
           are not in the DOM yet. */}
-      <div style={{ height: shown.totalHeight }} className="relative">
+      <div role="presentation" style={{ height: shown.totalHeight }} className="relative">
         {/* One transform for the block: rows stay in normal flow, which is
             what lets them be measured. */}
-        <div ref={listRef} data-rows style={{ transform: `translateY(${shown.offsetTop}px)` }}>
+        <div
+          ref={listRef}
+          data-rows
+          role="presentation"
+          style={{ transform: `translateY(${shown.offsetTop}px)` }}
+        >
           {visibleRows}
         </div>
       </div>

@@ -19,7 +19,10 @@ export function FileHeaderRow({
   readonly onToggle: () => void
 }) {
   return (
-    <div className="flex w-max min-w-full flex-wrap items-center gap-x-3 gap-y-1 border-t border-neutral-800 bg-neutral-900 px-3 py-2">
+    <div
+      role="gridcell"
+      className="flex w-max min-w-full flex-wrap items-center gap-x-3 gap-y-1 border-t border-neutral-800 bg-neutral-900 px-3 py-2"
+    >
       <Chevron collapsed={collapsed} onToggle={onToggle} label={describePath(file)} />
       <span className={`rounded px-1.5 py-0.5 text-[11px] ${STATUS_STYLES[file.status]}`}>
         {file.status}
@@ -50,7 +53,10 @@ export function HunkHeaderRow({
 }) {
   const range = `@@ -${hunk.oldStart},${hunk.oldCount} +${hunk.newStart},${hunk.newCount} @@`
   return (
-    <div className="flex w-max min-w-full items-center gap-2 bg-sky-500/10 px-3 py-1 font-mono text-xs text-sky-300/70">
+    <div
+      role="gridcell"
+      className="flex w-max min-w-full items-center gap-2 bg-sky-500/10 px-3 py-1 font-mono text-xs text-sky-300/70"
+    >
       <Chevron collapsed={collapsed} onToggle={onToggle} label={range} />
       <span className="select-none">
         {range}
@@ -62,7 +68,9 @@ export function HunkHeaderRow({
 
 export function NoteRow({ file }: { readonly file: DiffFile }) {
   return (
-    <p className="w-max min-w-full px-3 py-4 text-sm text-neutral-500">{describeEmptyBody(file)}</p>
+    <p role="gridcell" className="w-max min-w-full px-3 py-4 text-sm text-neutral-500">
+      {describeEmptyBody(file)}
+    </p>
   )
 }
 
@@ -120,7 +128,10 @@ export function ExpanderRow({
 }) {
   const next = Math.min(chunk, hidden)
   return (
-    <div className="flex w-max min-w-full items-center gap-3 border-y border-neutral-800 bg-neutral-900/60 px-3 py-1.5 text-xs">
+    <div
+      role="gridcell"
+      className="flex w-max min-w-full items-center gap-3 border-y border-neutral-800 bg-neutral-900/60 px-3 py-1.5 text-xs"
+    >
       <button
         type="button"
         onClick={onExpand}
