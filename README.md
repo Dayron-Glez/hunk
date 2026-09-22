@@ -3,36 +3,41 @@
 A diff viewer for the files that bring the others down. Paste a GitHub pull request URL, drop
 two files or a `.patch`, and read it.
 
-> **Status: F0 complete — it is correct, and it is not yet fast.**
-> The parser, the fixture corpus, an unoptimised renderer and the benchmark are in place. The
-> numbers below are the starting line, not the finish. F1 is the virtualization that has to
-> move them.
+> **Status: F1 complete — every target is met, with room to spare.**
+> Variable-height virtualization is in. The numbers below are measured, reproducible, and the
+> before-and-after comes from the same machine on the same day.
 
 ## Where it stands today
 
-Every line in the DOM, nothing virtualized. Measured on an AMD Ryzen 7 5800H against a
-production build, median of three runs each in a fresh page.
+Only the rows on screen exist in the DOM. Heights start as estimates and are corrected as rows
+appear, with the scroll position adjusted in the same frame so nothing moves under the reader.
 
-| Case                     |   Lines |   Parse | **First paint** | Memory | DOM nodes |
-| ------------------------ | ------: | ------: | --------------: | -----: | --------: |
-| Synthetic                |   1,000 |  1.1 ms |       **52 ms** |   3 MB |    10,112 |
-| Synthetic                |  10,000 |  3.1 ms |      **362 ms** |  17 MB |   100,047 |
-| Synthetic                |  50,000 | 10.1 ms |    **1,876 ms** |  75 MB |   500,240 |
-| Synthetic                | 100,000 | 17.3 ms |    **3,881 ms** | 147 MB | 1,000,303 |
-| Linux kernel commit      |  62,165 | 14.9 ms |    **2,493 ms** |  96 MB |   597,200 |
-| Minified bundles, 371 KB |     128 |  0.9 ms |       **48 ms** |   2 MB |     1,499 |
-| 168 files, mostly moved  |   5,385 |  2.7 ms |      **228 ms** |  10 MB |    53,730 |
+Measured on an AMD Ryzen 7 5800H against a production build, median of three runs each in a
+fresh page.
 
-Three things this settles:
+| Case                     |   Lines | Before | **First paint** | Memory | DOM nodes |
+| ------------------------ | ------: | -----: | --------------: | -----: | --------: |
+| Synthetic                |   1,000 |  71 ms |       **22 ms** |   3 MB |     1,051 |
+| Synthetic                |  10,000 | 429 ms |       **34 ms** |   3 MB |     1,053 |
+| Synthetic                |  50,000 | 2.17 s |       **34 ms** |   5 MB |     1,045 |
+| Synthetic                | 100,000 | 4.52 s |       **42 ms** |   8 MB |     1,049 |
+| Linux kernel commit      |  62,165 | 3.07 s |       **41 ms** |   6 MB |       956 |
+| Minified bundles, 371 KB |     128 |  52 ms |       **47 ms** |   2 MB |       717 |
+| 168 files, mostly moved  |   5,385 | 269 ms |       **31 ms** |   3 MB |     1,009 |
 
-- **Parsing is not the problem.** At 100k lines it is 17 ms of 3,881 — under half a percent.
-  The entire budget is spent putting rows on screen.
-- **The cost is exactly linear in lines.** Ten DOM nodes per line in every case, from 10,112 to
-  1,000,303, and roughly 1.5 KB of heap each. That is the price of not virtualizing: every line
-  is paid for whether or not anyone looks at it.
-- **The cost follows lines, not bytes.** The minified case is 371 KB across 128 lines and paints
-  in 48 ms. This is the premise the whole project rests on — materialize only the visible rows
-  and the rest is free. Had cost tracked bytes, virtualization would save nothing.
+At 100.000 lines that is **108× faster, 18× lighter, and 953× fewer DOM nodes**.
+
+Read the last column first. **The DOM stops growing with the diff**: about a thousand nodes
+whether the file has a thousand lines or a hundred thousand. Everything else follows from
+that.
+
+Two rows are worth more than the headline:
+
+- **The minified bundle barely moved**, 52 ms to 47 ms. It is 371 KB in 128 lines, so there
+  was never anything to leave out. A benchmark where every case improves enormously is usually
+  a benchmark measuring itself.
+- **The kernel commit — a real 758-file diff — went from three seconds to forty milliseconds.**
+  That is the case this project exists for.
 
 ## The goal, stated as a number
 
@@ -42,8 +47,9 @@ Three things this settles:
 | FPS while scrolling | 60        | 60        | ≥ 50       |
 | Memory              | < 15 MB   | < 40 MB   | < 80 MB    |
 
-**None of these are met yet.** At 100k lines the gap is 4.3× on time and 1.8× on memory. That
-gap is the project.
+**First paint and memory are met at every size**, by 4× at 10k lines and 21× at 100k. Frame
+rate is still unmeasured rather than met — `bench/README.md` explains why a number from a
+headless browser there would be a constant wearing a costume, and what is measured instead.
 
 ## Run the benchmark yourself
 

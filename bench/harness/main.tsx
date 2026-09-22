@@ -77,13 +77,19 @@ const lines = diff.files.reduce(
 /**
  * Waiting for React to commit is not the same as waiting for the browser to
  * show anything, and the number that matters is the second one. Poll frames
- * until the expected files are in the document, then let one more frame go by
- * so the paint that puts them on screen is included.
+ * until rows are in the document, then let one more frame go by so the paint
+ * that puts them on screen is included.
+ *
+ * The condition is "the reader can see the diff", not "every row exists".
+ * Those were the same thing before virtualization and are not any more, which
+ * is the entire point of the change — but it does mean a number from before
+ * and a number from after are answering slightly different questions, and
+ * bench/README.md says so.
  */
-const expectedSections = diff.files.length
 await new Promise<void>((resolve) => {
   const tick = (): void => {
-    if (document.querySelectorAll('section').length >= expectedSections) {
+    const rendered = document.querySelector('[data-rows]')?.childElementCount ?? 0
+    if (rendered > 0) {
       requestAnimationFrame(() => {
         resolve()
       })
@@ -124,7 +130,12 @@ window.__bench.timings = {
  * that never made it into a frame at all.
  */
 async function measureScroll(): Promise<ScrollReport> {
-  window.scrollTo(0, 0)
+  // The diff scrolls inside its own element now, not with the page, so the
+  // window's scroll position is not the one that moves anything.
+  const scroller = document.querySelector('[data-testid="diff-scroller"]')
+  if (scroller === null) throw new Error('no scroller to measure')
+
+  scroller.scrollTop = 0
   await sleep(300)
 
   const longFrames: number[] = []
@@ -153,12 +164,12 @@ async function measureScroll(): Promise<ScrollReport> {
   }
   sampleLag()
 
-  const height = document.documentElement.scrollHeight
+  const height = scroller.scrollHeight
   const step = Math.max(600, Math.round(height / 40))
   const startedScrolling = performance.now()
 
   for (let i = 0; i < 30; i += 1) {
-    window.scrollBy(0, step)
+    scroller.scrollTop += step
     await sleep(60)
   }
 
