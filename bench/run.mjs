@@ -100,6 +100,7 @@ const run = async () => {
           totalMs: median(runs.map((entry) => entry.totalMs)),
           runs: runs.map((entry) => entry.totalMs),
           scroll: last.scroll,
+          fold: last.fold,
           memoryMB: last.memoryMB,
           domNodes: last.domNodes,
         })
@@ -169,6 +170,7 @@ async function measureOnce(browser, origin, caseName, layout) {
       throw new Error(`asked for the ${layout} layout and the harness rendered ${timings.mode}`)
     }
     const scroll = await page.evaluate(() => window.__bench.measureScroll())
+    const fold = await page.evaluate(() => window.__bench.measureFold())
 
     // Collect garbage first, so the number is what the page is holding rather
     // than what it has not got around to releasing.
@@ -179,6 +181,7 @@ async function measureOnce(browser, origin, caseName, layout) {
     return {
       ...timings,
       scroll,
+      fold,
       memoryMB: Math.round(metric('JSHeapUsedSize') / 1048576),
       domNodes: Math.round(metric('Nodes')),
     }
@@ -188,7 +191,7 @@ async function measureOnce(browser, origin, caseName, layout) {
 }
 
 function report(results) {
-  const line = '─'.repeat(113)
+  const line = '─'.repeat(122)
   console.log()
   console.log(line)
   console.log(
@@ -200,6 +203,7 @@ function report(results) {
       pad('total', 10, true) +
       pad('blocked', 10, true) +
       pad('worst', 9, true) +
+      pad('fold', 9, true) +
       pad('memory', 9, true) +
       pad('DOM', 10, true),
   )
@@ -221,14 +225,16 @@ function report(results) {
         pad(`${entry.totalMs} ms`, 10, true) +
         pad(entry.scroll.blockingMeasurable ? `${entry.scroll.blockingMs} ms` : 'n/a', 10, true) +
         pad(entry.scroll.blockingMeasurable ? `${entry.scroll.worstBlockMs} ms` : 'n/a', 9, true) +
+        pad(entry.fold === null ? '—' : `${entry.fold.wallMs} ms`, 9, true) +
         pad(`${entry.memoryMB} MB`, 9, true) +
         pad(entry.domNodes.toLocaleString('en-US'), 10, true),
     )
   }
   console.log(line)
   console.log(
-    'blocked / worst: main-thread blocking while scrolling. Frames per second is not ' +
-      'reported — see bench/README.md for why a headless number there means nothing.',
+    'blocked / worst: main-thread blocking while scrolling. fold: one click on a fold ' +
+      'control, click to next frame. Frames per second is not reported — see ' +
+      'bench/README.md for why a headless number there means nothing.',
   )
 }
 
