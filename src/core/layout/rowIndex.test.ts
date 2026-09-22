@@ -165,4 +165,106 @@ describe('at scale', () => {
     // allocating per row.
     expect(elapsed).toBeLessThan(250)
   })
+
+  it('pairs the columns of the same commit without walking it twice over', () => {
+    const diff = parseUnifiedDiff(readFixture('github', 'linux-93e4b307-huge.diff'))
+    const startedAt = performance.now()
+    const index = new RowIndex(diff, 'split')
+    const elapsed = performance.now() - startedAt
+
+    // 61.457 rows against 64.807 unified: the 3.350 pairs that share one row.
+    expect(index.length).toBeLessThan(new RowIndex(diff).length)
+    // 10 ms measured, against 4 ms unified — the aligner allocates a row object
+    // per line, and this runs once when the reader switches, not per frame.
+    expect(elapsed).toBeLessThan(250)
+  })
+})
+
+describe('two columns', () => {
+  const split = (set: 'github' | 'edge', name: string): RowIndex =>
+    new RowIndex(parseUnifiedDiff(readFixture(set, name)), 'split')
+
+  /** Each row as `left|right`, with a dash where a column has a gap. */
+  const cells = (index: RowIndex): string[] => {
+    const out: string[] = []
+    for (let row = 0; row < index.length; row += 1) {
+      if (index.kindAt(row) !== 3) continue
+      out.push(
+        `${index.cellAt(row, 'old')?.content ?? '-'}|${index.cellAt(row, 'new')?.content ?? '-'}`,
+      )
+    }
+    return out
+  }
+
+  it('puts a replaced line beside its replacement on one row', () => {
+    expect(cells(split('edge', 'single-line-hunk-header.diff'))).toEqual(['solo|unico'])
+  })
+
+  it('still lays headers and notes out the same way', () => {
+    expect(shapeOf(split('edge', 'mode-change-only.diff'))).toEqual(['file-header', 'note'])
+  })
+
+  it('has no rows at all for an empty diff', () => {
+    expect(new RowIndex(parseUnifiedDiff(''), 'split').length).toBe(0)
+  })
+
+  it('reports which layout it was built for', () => {
+    expect(split('edge', 'many-hunks.diff').mode).toBe('split')
+    expect(indexOf('edge', 'many-hunks.diff').mode).toBe('unified')
+  })
+})
+
+/**
+ * A line the reader cannot see, or one shown twice, is a file that never
+ * existed. The unified mode has held this since F1; the two-column mode drops
+ * rows on purpose, so it needs saying again over the same corpus.
+ */
+describe.each([
+  ['github', 'vite-pr-23346-normal.diff'],
+  ['github', 'vite-pr-23378-new-files.diff'],
+  ['github', 'prettier-bb52ae36-rename.diff'],
+  ['github', 'npm-cli-47fc8b19-mass-rename.diff'],
+  ['github', 'linux-93e4b307-huge.diff'],
+] as const)('%s/%s holds them in two columns too', (set, name) => {
+  const diff = parseUnifiedDiff(readFixture(set, name))
+  const index = new RowIndex(diff, 'split')
+
+  it('shows every line exactly once, in the column its kind belongs to', () => {
+    const seen = new Map<string, number>()
+    for (let row = 0; row < index.length; row += 1) {
+      if (index.kindAt(row) !== 3) continue
+      const key = `${index.fileIndexAt(row)}:${index.hunkIndexAt(row)}`
+
+      for (const column of ['old', 'new'] as const) {
+        const lineIndex = index.cellIndexAt(row, column)
+        if (lineIndex === -1) continue
+        const kind = index.cellAt(row, column)?.kind
+        expect(kind).not.toBe(column === 'old' ? 'insert' : 'delete')
+        const mark = `${key}:${column}:${lineIndex}`
+        expect(seen.has(mark)).toBe(false)
+        seen.set(mark, row)
+      }
+    }
+
+    let expected = 0
+    for (const file of diff.files) {
+      for (const hunk of file.hunks) {
+        for (const line of hunk.lines) expected += line.kind === 'context' ? 2 : 1
+      }
+    }
+    expect(seen.size).toBe(expected)
+  })
+
+  it('never leaves a line row with both columns empty', () => {
+    for (let row = 0; row < index.length; row += 1) {
+      if (index.kindAt(row) !== 3) continue
+      expect(index.cellIndexAt(row, 'old') === -1 && index.cellIndexAt(row, 'new') === -1).toBe(
+        false,
+      )
+    }
+  })
+
+  it('needs fewer rows than the unified view of the same diff', () => {
+    expect(index.length).toBeLessThanOrEqual(new RowIndex(diff).length)
+  })
 })
