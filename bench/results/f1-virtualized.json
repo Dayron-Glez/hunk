@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-09-22T10:49:18.206Z",
+  "recordedAt": "2026-09-22T10:46:41.592Z",
   "machine": {
     "platform": "win32",
     "arch": "x64",
@@ -15,25 +15,25 @@
       "files": 6,
       "lines": 1000,
       "parseMs": 1,
-      "renderMs": 69.6,
-      "totalMs": 70.6,
+      "renderMs": 20.9,
+      "totalMs": 21.8,
       "runs": [
-        73.4,
-        65.7,
-        70.6
+        34.1,
+        21.8,
+        21.7
       ],
       "scroll": {
         "blockingMeasurable": true,
         "blockingMs": 0,
         "worstBlockMs": 0,
         "longFrames": 0,
-        "lagMedianMs": 4.5,
-        "lagWorstMs": 18.5,
-        "durationMs": 1885.1,
-        "documentHeightPx": 20957
+        "lagMedianMs": 4.7,
+        "lagWorstMs": 11.4,
+        "durationMs": 1867.9,
+        "documentHeightPx": 20798
       },
       "memoryMB": 3,
-      "domNodes": 10112
+      "domNodes": 1051
     },
     {
       "name": "synthetic-10k",
@@ -42,25 +42,25 @@
       "files": 43,
       "lines": 10000,
       "parseMs": 3,
-      "renderMs": 425.5,
-      "totalMs": 428.5,
+      "renderMs": 30.9,
+      "totalMs": 34.2,
       "runs": [
-        428.5,
-        428,
-        469
+        26.2,
+        36.4,
+        34.2
       ],
       "scroll": {
         "blockingMeasurable": true,
         "blockingMs": 0,
         "worstBlockMs": 0,
         "longFrames": 0,
-        "lagMedianMs": 4.9,
-        "lagWorstMs": 29.1,
-        "durationMs": 1886.7,
-        "documentHeightPx": 207355
+        "lagMedianMs": 4.7,
+        "lagWorstMs": 10,
+        "durationMs": 1872.7,
+        "documentHeightPx": 206511
       },
-      "memoryMB": 17,
-      "domNodes": 100047
+      "memoryMB": 3,
+      "domNodes": 1053
     },
     {
       "name": "synthetic-50k",
@@ -68,26 +68,26 @@
       "bytes": 2149536,
       "files": 205,
       "lines": 50000,
-      "parseMs": 8.6,
-      "renderMs": 2158.5,
-      "totalMs": 2167.1,
+      "parseMs": 8.7,
+      "renderMs": 25.6,
+      "totalMs": 34.3,
       "runs": [
-        2180,
-        2167.1,
-        2166
+        34.3,
+        35.7,
+        33.1
       ],
       "scroll": {
         "blockingMeasurable": true,
         "blockingMs": 0,
         "worstBlockMs": 0,
         "longFrames": 0,
-        "lagMedianMs": 15,
-        "lagWorstMs": 151.8,
-        "durationMs": 2178.9,
-        "documentHeightPx": 1035642
+        "lagMedianMs": 4.6,
+        "lagWorstMs": 10.5,
+        "durationMs": 1879.8,
+        "documentHeightPx": 1031801
       },
-      "memoryMB": 75,
-      "domNodes": 500240
+      "memoryMB": 5,
+      "domNodes": 1045
     },
     {
       "name": "synthetic-100k",
@@ -95,26 +95,26 @@
       "bytes": 4297571,
       "files": 407,
       "lines": 100000,
-      "parseMs": 16,
-      "renderMs": 4500.6,
-      "totalMs": 4516.3,
+      "parseMs": 15.5,
+      "renderMs": 25.9,
+      "totalMs": 41.8,
       "runs": [
-        4516.2,
-        4547.8,
-        4516.3
+        40.6,
+        42.3,
+        41.8
       ],
       "scroll": {
         "blockingMeasurable": true,
         "blockingMs": 0,
         "worstBlockMs": 0,
         "longFrames": 0,
-        "lagMedianMs": 14.3,
-        "lagWorstMs": 125.6,
-        "durationMs": 2216.9,
-        "documentHeightPx": 2071237
+        "lagMedianMs": 4.8,
+        "lagWorstMs": 12.3,
+        "durationMs": 1874.6,
+        "documentHeightPx": 2063659
       },
-      "memoryMB": 147,
-      "domNodes": 1000303
+      "memoryMB": 8,
+      "domNodes": 1049
     },
     {
       "name": "real-kernel",
@@ -122,26 +122,26 @@
       "bytes": 2121675,
       "files": 758,
       "lines": 62165,
-      "parseMs": 12.6,
-      "renderMs": 3055.8,
-      "totalMs": 3068.1,
+      "parseMs": 12.1,
+      "renderMs": 28.4,
+      "totalMs": 40.5,
       "runs": [
-        3110,
-        3040.3,
-        3068.1
+        41,
+        40.5,
+        39.2
       ],
       "scroll": {
         "blockingMeasurable": true,
         "blockingMs": 0,
         "worstBlockMs": 0,
         "longFrames": 0,
-        "lagMedianMs": 14.9,
-        "lagWorstMs": 86.1,
-        "durationMs": 2095.3,
-        "documentHeightPx": 1330773
+        "lagMedianMs": 4.6,
+        "lagWorstMs": 10.2,
+        "durationMs": 1871.7,
+        "documentHeightPx": 1316702
       },
-      "memoryMB": 96,
-      "domNodes": 597200
+      "memoryMB": 6,
+      "domNodes": 956
     },
     {
       "name": "real-minified",
@@ -149,26 +149,26 @@
       "bytes": 379969,
       "files": 9,
       "lines": 128,
-      "parseMs": 0.7,
-      "renderMs": 51.7,
-      "totalMs": 52.3,
+      "parseMs": 0.8,
+      "renderMs": 46.4,
+      "totalMs": 47.2,
       "runs": [
-        57.5,
-        52.3,
-        51.3
+        47.2,
+        47.1,
+        47.3
       ],
       "scroll": {
         "blockingMeasurable": true,
         "blockingMs": 0,
         "worstBlockMs": 0,
         "longFrames": 0,
-        "lagMedianMs": 4.4,
-        "lagWorstMs": 6.8,
-        "durationMs": 1872.5,
-        "documentHeightPx": 3348
+        "lagMedianMs": 4.3,
+        "lagWorstMs": 7.2,
+        "durationMs": 1865.9,
+        "documentHeightPx": 3133
       },
       "memoryMB": 2,
-      "domNodes": 1499
+      "domNodes": 717
     },
     {
       "name": "real-mass-rename",
@@ -177,12 +177,12 @@
       "files": 168,
       "lines": 5385,
       "parseMs": 2.2,
-      "renderMs": 266.6,
-      "totalMs": 268.8,
+      "renderMs": 28.7,
+      "totalMs": 30.9,
       "runs": [
-        268.8,
-        266.7,
-        304.1
+        26.3,
+        30.9,
+        35.1
       ],
       "scroll": {
         "blockingMeasurable": true,
@@ -190,12 +190,12 @@
         "worstBlockMs": 0,
         "longFrames": 0,
         "lagMedianMs": 4.6,
-        "lagWorstMs": 9.7,
-        "durationMs": 1874.8,
-        "documentHeightPx": 127100
+        "lagWorstMs": 15.7,
+        "durationMs": 1873.7,
+        "documentHeightPx": 123944
       },
-      "memoryMB": 10,
-      "domNodes": 53730
+      "memoryMB": 3,
+      "domNodes": 1009
     }
   ]
 }

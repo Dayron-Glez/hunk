@@ -1,5 +1,15 @@
 @import 'tailwindcss';
 
+/*
+ * Say where the classes live instead of letting Tailwind guess.
+ *
+ * It infers the source tree from the build root, and the benchmark builds from
+ * bench/harness — so it scanned that directory, found almost no classes, and
+ * produced a stylesheet without them. The harness rendered unstyled and nobody
+ * noticed, because an unstyled diff still looks like a list of lines.
+ */
+@source '../src';
+
 @theme {
   --font-mono:
     ui-monospace, 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', monospace;
