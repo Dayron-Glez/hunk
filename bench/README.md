@@ -113,6 +113,7 @@ says what they are, and those _are_ committed:
 | ---------------------- | ------------------------------------------------------------------------------ |
 | `f0-naive-render.json` | Every line in the DOM, nothing virtualized. The measurement F1 had to beat.    |
 | `f1-virtualized.json`  | Only the visible rows in the DOM, heights measured and corrected as they land. |
+| `f2-highlighted.json`  | The same, with syntax highlighting arriving from a worker.                     |
 
 Copy `latest.json` to a new name whenever a run is worth keeping. Without that, the first run
 after a change destroys the number the change was supposed to be compared against.
