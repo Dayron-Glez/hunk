@@ -19,6 +19,14 @@ const EMPTY: WordChanges = { before: [], after: [] }
 const MAX_TOKENS = 300
 
 /**
+ * Tokenizing is linear but not free: a pair of 66.000 character lines costs
+ * 5.7 ms even when the edit is tiny, against 0.5 ms at this length. The same
+ * ceiling the highlighter uses, for the same reason — past it a line is
+ * minified, and nobody reads it closely enough to care which word moved.
+ */
+const MAX_LINE_LENGTH = 2_000
+
+/**
  * Below this share of the line surviving, the two lines are not versions of
  * each other. Marking most of both as changed tells the reader nothing they
  * cannot see from the red and the green.
@@ -37,6 +45,7 @@ const WORD = /[\p{L}\p{N}_$]/u
  */
 export function wordDiff(before: string, after: string): WordChanges {
   if (before === after) return EMPTY
+  if (before.length > MAX_LINE_LENGTH || after.length > MAX_LINE_LENGTH) return EMPTY
 
   const a = tokenize(before)
   const b = tokenize(after)

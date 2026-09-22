@@ -79,17 +79,32 @@ describe('saying nothing', () => {
 })
 
 describe('input that would cost too much', () => {
-  it('stays quiet on two long lines that share nothing', () => {
-    const before = Array.from({ length: 2_000 }, (_, i) => `a${i}`).join(' ')
-    const after = Array.from({ length: 2_000 }, (_, i) => `b${i}`).join(' ')
+  it('says nothing about a line too long to be read closely', () => {
+    const before = 'x'.repeat(2_001)
+    const after = `${'x'.repeat(2_000)}y`
+    expect(wordDiff(before, after)).toEqual({ before: [], after: [] })
+  })
+
+  it('still works right up to the ceiling', () => {
+    const before = `${'x'.repeat(1_990)} old`
+    const after = `${'x'.repeat(1_990)} new`
+    expect(marked(before, wordDiff(before, after).before)).toEqual(['old'])
+  })
+
+  it('stays quiet on two token-heavy lines that share nothing', () => {
+    // Under the character ceiling, so this exercises the token cap rather than it.
+    const before = Array.from({ length: 400 }, (_, i) => `a${i}`).join(' ')
+    const after = Array.from({ length: 400 }, (_, i) => `b${i}`).join(' ')
+    expect(before.length).toBeLessThan(2_000)
+
     const started = performance.now()
     expect(wordDiff(before, after)).toEqual({ before: [], after: [] })
     // The table is never built: it bails on token count first.
     expect(performance.now() - started).toBeLessThan(200)
   })
 
-  it('still finds a small edit in the middle of two long lines', () => {
-    const common = Array.from({ length: 2_000 }, (_, i) => `t${i}`).join(' ')
+  it('still finds a small edit at the end of a token-heavy line', () => {
+    const common = Array.from({ length: 400 }, (_, i) => `t${i}`).join(' ')
     const changes = wordDiff(`${common} end`, `${common} END`)
     expect(marked(`${common} end`, changes.before)).toEqual(['end'])
   })
