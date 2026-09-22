@@ -9,6 +9,8 @@ import { defineConfig } from 'vite'
  * number measured against a development build measures Vite, not hunk.
  */
 export default defineConfig({
+  // Same reason as the application config: iife workers cannot code-split.
+  worker: { format: 'es' },
   root: fileURLToPath(new URL('./harness', import.meta.url)),
   base: './',
   plugins: [react(), tailwindcss()],

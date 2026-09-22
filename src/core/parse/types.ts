@@ -34,11 +34,8 @@ export interface DiffFile {
   readonly similarity: number | null
   readonly binary: boolean
   readonly submodule: boolean
-  /**
-   * A merge diff (`@@@`). Its hunks are not parsed: two pre-images per line is a
-   * different format, not a variation on this one. Kept distinct so the caller can
-   * say so instead of showing an empty file.
-   */
+  /** A merge diff (`@@@`). Hunks are not parsed — two pre-images per line is a
+   *  different format — but it is flagged so the caller can say so. */
   readonly combined: boolean
   readonly hunks: readonly Hunk[]
   readonly additions: number

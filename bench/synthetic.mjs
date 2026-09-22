@@ -11,6 +11,8 @@
  * Feeding it something malformed would measure the error path instead.
  */
 
+const NEWLINE = String.fromCharCode(10)
+
 const IDENTIFIERS = [
   'value',
   'result',
@@ -150,4 +152,105 @@ function hash(random) {
   let text = ''
   while (text.length < 7) text += Math.floor(random() * 16).toString(16)
   return text.slice(0, 7)
+}
+
+/**
+ * A diff of the same size whose changed lines are edits of each other, not
+ * unrelated lines.
+ *
+ * `buildSyntheticDiff` pairs a removal with an unrelated insertion, so the
+ * intra-line diff correctly finds nothing to mark and the case measures none of
+ * that work. Real diffs are mostly small edits: on the Linux kernel fixture
+ * 82% of paired lines carry intra-line marks, against 23% here. This one
+ * matches that shape, so the cost of finding what changed inside a line is in
+ * the numbers rather than missing from them.
+ *
+ * A separate function on purpose: the older cases keep their bytes, and the
+ * recorded F0, F1 and F2 baselines stay comparable.
+ */
+export function buildEditedDiff(targetLines, seed = 0xed17) {
+  const random = createRandom(seed)
+  const out = []
+  let produced = 0
+  let fileIndex = 0
+
+  while (produced < targetLines) {
+    const path = `src/edited/module-${String(fileIndex).padStart(4, '0')}.ts`
+    out.push(`diff --git a/${path} b/${path}`)
+    out.push(`index ${hash(random)}..${hash(random)} 100644`)
+    out.push(`--- a/${path}`)
+    out.push(`+++ b/${path}`)
+
+    const hunksInFile = 3 + Math.floor(random() * 5)
+    let oldCursor = 1
+    let newCursor = 1
+
+    for (let h = 0; h < hunksInFile && produced < targetLines; h += 1) {
+      const lines = []
+      const wanted = Math.min(20 + Math.floor(random() * 60), targetLines - produced)
+
+      let oldCount = 0
+      let newCount = 0
+
+      // Real diffs move in blocks: a little context, then a run that is either
+      // a replacement, a pure addition or a pure deletion. Interleaving line by
+      // line instead leaves unrelated removals and insertions adjacent, and the
+      // pairing then finds partners that were never versions of each other.
+      while (lines.length < wanted) {
+        for (let c = 0; c < 1 + Math.floor(random() * 2) && lines.length < wanted; c += 1) {
+          lines.push(` ${codeLine(random, Math.floor(random() * 4))}`)
+          oldCount += 1
+          newCount += 1
+        }
+
+        const block = 1 + Math.floor(random() * 8)
+        const roll = random()
+
+        if (roll < 0.12) {
+          const replaced = []
+          for (let r = 0; r < Math.min(block, 3) && lines.length < wanted - 1; r += 1) {
+            replaced.push(codeLine(random, Math.floor(random() * 4)))
+            lines.push(`-${replaced[r]}`)
+            oldCount += 1
+          }
+          for (const body of replaced) {
+            lines.push(`+${edit(body, random)}`)
+            newCount += 1
+          }
+        } else if (roll < 0.67) {
+          for (let b = 0; b < block && lines.length < wanted; b += 1) {
+            lines.push(`+${codeLine(random, Math.floor(random() * 4))}`)
+            newCount += 1
+          }
+        } else {
+          for (let b = 0; b < block && lines.length < wanted; b += 1) {
+            lines.push(`-${codeLine(random, Math.floor(random() * 4))}`)
+            oldCount += 1
+          }
+        }
+      }
+
+      if (oldCount === 0 || newCount === 0) continue
+
+      out.push(`@@ -${oldCursor},${oldCount} +${newCursor},${newCount} @@ function block${h}()`)
+      out.push(...lines)
+
+      produced += lines.length
+      oldCursor += oldCount + 10 + Math.floor(random() * 30)
+      newCursor += newCount + 10 + Math.floor(random() * 30)
+    }
+
+    fileIndex += 1
+  }
+
+  return out.join(NEWLINE) + NEWLINE
+}
+
+/** Swap one identifier for another, leaving the rest of the line alone. */
+function edit(line, random) {
+  const replacement = pick(random, IDENTIFIERS)
+  const match = /[A-Za-z_$][A-Za-z0-9_$]*/.exec(line)
+  if (match === null) return `${line} // ${replacement}`
+  const at = match.index
+  return line.slice(0, at) + replacement + line.slice(at + match[0].length)
 }

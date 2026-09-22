@@ -1,12 +1,11 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readFixture } from '../../tests/fixtures'
 import { parseUnifiedDiff } from '../core/parse/unified'
 import { DiffView } from './DiffView'
 
-const renderFixture = (set: 'edge' | 'github', name: string): void => {
+const renderFixture = (set: 'edge' | 'github', name: string) =>
   render(<DiffView diff={parseUnifiedDiff(readFixture(set, name))} />)
-}
 
 // The tests below are about what the viewer says, not about what it leaves out,
 // so they are given a viewport tall enough to hold the whole fixture. The
@@ -64,8 +63,10 @@ describe('DiffView', () => {
   })
 
   it('names a submodule change rather than showing an empty file', () => {
-    renderFixture('github', 'git-4125f782-submodule-bump.diff')
-    expect(screen.getByText(/Subproject commit 855827c583bc30/)).toBeInTheDocument()
+    const { container } = renderFixture('github', 'git-4125f782-submodule-bump.diff')
+    // Read the rendered text rather than one node: intra-line highlighting
+    // splits a line wherever part of it changed, which is the point of it.
+    expect(container.textContent).toContain('Subproject commit 855827c583bc30')
   })
 
   it('flags the no-newline marker on the line it belongs to', () => {
@@ -88,5 +89,31 @@ describe('DiffView', () => {
     )
     expect(screen.getByText(/combined \(merge\) diffs are not supported/)).toBeInTheDocument()
     expect(screen.getByText('Combined diff from a merge — not supported yet.')).toBeInTheDocument()
+  })
+})
+
+describe('choosing a layout', () => {
+  it('starts unified, with one line per row', () => {
+    renderFixture('edge', 'mode-change-with-content.diff')
+    expect(screen.getByRole('button', { name: 'Unified' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('puts the two versions of an edited line on one row when asked to', () => {
+    renderFixture('edge', 'mode-change-with-content.diff')
+    fireEvent.click(screen.getByRole('button', { name: 'Split' }))
+
+    const rows = Array.from(
+      screen.getByTestId('diff-scroller').querySelector('[data-rows]')!.children,
+    ) as HTMLElement[]
+    const paired = rows.find((row) => row.children[0]?.textContent?.includes('bravo') === true)
+    expect(paired?.children[1]?.textContent).toContain('BRAVO')
+  })
+
+  it('goes back to one column', () => {
+    renderFixture('edge', 'mode-change-with-content.diff')
+    fireEvent.click(screen.getByRole('button', { name: 'Split' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Unified' }))
+    expect(screen.getByRole('button', { name: 'Unified' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('alpha')).toBeInTheDocument()
   })
 })

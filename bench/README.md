@@ -5,8 +5,9 @@ directory is that claim, executable.
 
 ```bash
 npx playwright install chromium   # once — the browser is not part of npm install
-npm run bench                     # every case
+npm run bench                     # every case, in both layouts
 npm run bench -- synthetic-1k     # one case, by name or fragment
+npm run bench -- --split          # one layout only
 ```
 
 Playwright ships its browser separately from its npm package, so a fresh clone has the runner
@@ -26,10 +27,24 @@ being measured.
 | `fps`    | Frames served while the page scrolls itself from top to bottom.                                       |
 | `memory` | JavaScript heap after a forced garbage collection, from the browser rather than from inside the page. |
 | `DOM`    | Nodes in the document. The number virtualization exists to keep small.                                |
+| `layout` | Unified, or the two versions side by side. Every case is measured in both.                            |
 
 `total` is a median of three runs, each in a fresh page. Frame rate and memory come from the
 last run only — they need a live page, and repeating a three-second scroll three times triples
 the wall clock for a number that barely moves.
+
+### Both layouts, every case
+
+The two-column view is a different document, not a skin over the same one: it drops the rows
+where a removal and its replacement share a line, and it puts two cells in each row that
+survives. Fewer rows, more nodes per row. Neither of those is obviously the faster trade, so the
+harness renders every case twice and the table puts the pair side by side.
+
+It opens in the layout being measured rather than switching into it, because a first paint
+measured after a toggle would be measuring the toggle. Switching is its own number and is not in
+this table: on the kernel commit it blocks the main thread for 64-92 ms, once, on a click.
+
+Snapshots recorded before F3 have no `layout` field. They are all unified.
 
 **`render` means "the reader can see the diff", not "every row exists".** Before
 virtualization those were the same thing. They are not any more, and that is the entire point
@@ -63,6 +78,13 @@ re-measured with styles before anything was compared against it.
 ## The cases
 
 Four synthetic sizes and three real diffs.
+
+There are two synthetic shapes because one was not enough. `synthetic-100k` pairs a removal
+with an unrelated insertion, so the intra-line diff correctly finds nothing and the case
+measures none of that work — 2% of its lines are paired, against 11% of the kernel's.
+`synthetic-100k-edits` matches the real shape instead: a little context, then a replacement, a
+pure addition or a pure deletion, the way a real diff moves. The older case keeps its bytes, so
+the F0, F1 and F2 baselines stay comparable.
 
 The synthetic ones exist because they are the only way to ask "what happens at exactly 100.000
 lines". They are built by `synthetic.mjs` from a seeded generator: the same size always
@@ -113,6 +135,9 @@ says what they are, and those _are_ committed:
 | ---------------------- | ------------------------------------------------------------------------------ |
 | `f0-naive-render.json` | Every line in the DOM, nothing virtualized. The measurement F1 had to beat.    |
 | `f1-virtualized.json`  | Only the visible rows in the DOM, heights measured and corrected as they land. |
+| `f2-highlighted.json`  | The same, with syntax highlighting arriving from a worker.                     |
+| `f3-word-diff.json`    | The same, marking what changed inside a line.                                  |
+| `f3-side-by-side.json` | Both layouts of every case, once the two-column view existed to measure.       |
 
 Copy `latest.json` to a new name whenever a run is worth keeping. Without that, the first run
 after a change destroys the number the change was supposed to be compared against.

@@ -1,18 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { RowIndex, RowKind } from '../core/layout/rowIndex'
+import { HighlightStore } from '../core/highlight/store'
+import { RowIndex, RowKind, type LayoutMode } from '../core/layout/rowIndex'
 import { Virtualizer, type VisibleWindow } from '../core/layout/virtualizer'
 import type { ParsedDiff } from '../core/parse/types'
-import { DiffRow } from './DiffRow'
+import { HighlightClient } from '../workers/highlightClient'
+import { DiffRow, SplitDiffRow } from './DiffRow'
 import { FileHeaderRow, HunkHeaderRow, NoteRow } from './rows'
 
-/**
- * What each kind of row is assumed to measure before anyone looks.
- *
- * Only a starting point: every row that reaches the screen is measured and the
- * estimate replaced. They are here so the scrollbar is roughly right on the
- * first frame rather than settling visibly as the reader scrolls — and so that
- * a document of mostly file headers is not sized as though it were all lines.
- */
+/** Starting points only — every row that reaches the screen is measured. They
+ *  keep the scrollbar roughly right on the first frame. */
 const ESTIMATED_HEIGHT: Record<RowKind, number> = {
   [RowKind.FileHeader]: 37,
   [RowKind.Note]: 52,
@@ -20,11 +16,20 @@ const ESTIMATED_HEIGHT: Record<RowKind, number> = {
   [RowKind.Line]: 20,
 }
 
-/** Rendered beyond the viewport on each side, so small scrolls need no new rows. */
+/** Rendered beyond the viewport, so small scrolls need no new rows. */
 const OVERSCAN_PX = 600
 
-export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
-  const rows = useMemo(() => new RowIndex(diff), [diff])
+export function VirtualDiff({
+  diff,
+  mode = 'unified',
+}: {
+  readonly diff: ParsedDiff
+  readonly mode?: LayoutMode
+}) {
+  // Rebuilt on a mode change rather than kept for both: the second index costs
+  // 10 ms on the kernel commit, and holding it costs 1 MB for as long as the
+  // reader stays in the mode that does not use it.
+  const rows = useMemo(() => new RowIndex(diff, mode), [diff, mode])
 
   const virtualizer = useMemo(() => {
     const estimates = new Float64Array(rows.length)
@@ -36,11 +41,45 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
 
   const scrollerRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  // Cached so the scroll handler never reads layout; a read during scroll can
-  // force the browser to flush pending work at the worst possible moment.
+  // Cached: reading layout inside a scroll handler can force the browser to
+  // flush pending work at the worst possible moment.
   const viewportHeight = useRef(0)
 
   const [view, setView] = useState<VisibleWindow>(() => virtualizer.visible)
+  // Which virtualizer `view` describes. Switching layout builds a new one over
+  // a shorter document, and a window left over from the longer one asks for
+  // rows that no longer exist. Reset here rather than in an effect: an effect
+  // runs after the render that would already have read past the end.
+  const [described, setDescribed] = useState(virtualizer)
+  let shown = view
+  if (described !== virtualizer) {
+    shown = virtualizer.visible
+    setDescribed(virtualizer)
+    setView(shown)
+  }
+  // Bumped when colours land, which is the only thing that makes this render
+  // without the window having moved.
+  const [coloured, setColoured] = useState(0)
+
+  const highlights = useMemo(() => {
+    const client = new HighlightClient()
+    const store = new HighlightStore(rows, client, () => {
+      setColoured((n) => n + 1)
+    })
+    return { client, store }
+  }, [rows])
+
+  useEffect(
+    () => () => {
+      highlights.client.dispose()
+    },
+    [highlights],
+  )
+
+  // Only what is on screen, plus the overscan the window already carries.
+  useEffect(() => {
+    highlights.store.requestRange(view.first, view.last)
+  }, [highlights, view.first, view.last])
 
   const refresh = useCallback(() => {
     const scroller = scrollerRef.current
@@ -51,18 +90,13 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
   }, [virtualizer])
 
   /**
-   * Measure what was just rendered, then put the view back where it was.
+   * Measure what was rendered, then put the view back where it was.
    *
-   * This deliberately loops: measuring rows changes the layout, which can change
-   * which rows belong on screen, which renders different rows to measure. It
-   * settles rather than spinning because a height equal to its last value
-   * reports no change and the window then stops moving — so the effect runs
-   * again only when it has produced something new to look at, which is why the
-   * dependency is the window itself.
-   *
-   * It has to be a layout effect rather than an ordinary one: the scroll
-   * correction must land before the browser paints, or the reader sees exactly
-   * the jump it exists to prevent.
+   * This loops on purpose — measuring changes the layout, which can change which
+   * rows belong on screen. It settles because an unchanged height reports no
+   * change, which is why the dependency is the window itself. A layout effect
+   * rather than an ordinary one: the correction must land before the paint, or
+   * the reader sees the jump it exists to prevent.
    */
   useLayoutEffect(() => {
     const scroller = scrollerRef.current
@@ -75,9 +109,8 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
     for (let i = 0; i < children.length; i += 1) {
       const element = children[i]
       if (element === undefined) continue
-      // getBoundingClientRect, not offsetHeight: the latter rounds to whole
-      // pixels, and rounding a hundred thousand rows drifts the document by
-      // more than a screenful.
+      // Not offsetHeight: it rounds to whole pixels, and rounding a hundred
+      // thousand rows drifts the document by more than a screenful.
       virtualizer.measure(view.first + i, element.getBoundingClientRect().height)
     }
 
@@ -106,9 +139,10 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
   }, [refresh])
 
   const visibleRows = []
-  for (let row = view.first; row <= view.last; row += 1) {
-    visibleRows.push(<Row key={row} rows={rows} row={row} />)
+  for (let row = shown.first; row <= shown.last; row += 1) {
+    visibleRows.push(<Row key={row} rows={rows} row={row} store={highlights.store} />)
   }
+  void coloured
 
   return (
     <div
@@ -117,12 +151,12 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
       className="h-full overflow-auto bg-neutral-950 font-mono text-xs"
       data-testid="diff-scroller"
     >
-      {/* Holds the scrollbar at the size of the whole document, so the reader
-          can scroll to a row that does not exist in the DOM yet. */}
-      <div style={{ height: view.totalHeight }} className="relative">
-        {/* One transform for the whole block, rather than positioning every row.
-            Rows stay in normal flow, which is what lets them be measured. */}
-        <div ref={listRef} data-rows style={{ transform: `translateY(${view.offsetTop}px)` }}>
+      {/* Sized for the whole document, so the reader can scroll to rows that
+          are not in the DOM yet. */}
+      <div style={{ height: shown.totalHeight }} className="relative">
+        {/* One transform for the block: rows stay in normal flow, which is
+            what lets them be measured. */}
+        <div ref={listRef} data-rows style={{ transform: `translateY(${shown.offsetTop}px)` }}>
           {visibleRows}
         </div>
       </div>
@@ -130,7 +164,15 @@ export function VirtualDiff({ diff }: { readonly diff: ParsedDiff }) {
   )
 }
 
-function Row({ rows, row }: { readonly rows: RowIndex; readonly row: number }) {
+function Row({
+  rows,
+  row,
+  store,
+}: {
+  readonly rows: RowIndex
+  readonly row: number
+  readonly store: HighlightStore
+}) {
   switch (rows.kindAt(row)) {
     case RowKind.FileHeader:
       return <FileHeaderRow file={rows.fileAt(row)} />
@@ -139,7 +181,16 @@ function Row({ rows, row }: { readonly rows: RowIndex; readonly row: number }) {
     case RowKind.HunkHeader:
       return <HunkHeaderRow hunk={rows.hunkAt(row)!} />
     default:
-      return <DiffRow line={rows.lineAt(row)!} />
+      return rows.mode === 'split' ? (
+        <SplitDiffRow
+          oldLine={rows.cellAt(row, 'old')}
+          newLine={rows.cellAt(row, 'new')}
+          oldSegments={store.segmentsFor(row, 'old')}
+          newSegments={store.segmentsFor(row, 'new')}
+        />
+      ) : (
+        <DiffRow line={rows.lineAt(row)!} segments={store.segmentsFor(row)} />
+      )
   }
 }
 

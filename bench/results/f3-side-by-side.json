@@ -1,0 +1,460 @@
+{
+  "recordedAt": "2026-09-22T20:03:03.407Z",
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "cpus": "AMD Ryzen 7 5800H with Radeon Graphics",
+    "node": "v22.18.0"
+  },
+  "repeats": 3,
+  "results": [
+    {
+      "name": "synthetic-1k",
+      "label": "1k lines",
+      "layout": "unified",
+      "bytes": 42367,
+      "files": 6,
+      "lines": 1000,
+      "parseMs": 1.1,
+      "renderMs": 30.9,
+      "totalMs": 32,
+      "runs": [
+        50.8,
+        27.8,
+        32
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.7,
+        "lagWorstMs": 8.9,
+        "durationMs": 1887.2,
+        "documentHeightPx": 20798
+      },
+      "memoryMB": 3,
+      "domNodes": 2128
+    },
+    {
+      "name": "synthetic-1k",
+      "label": "1k lines",
+      "layout": "split",
+      "bytes": 42367,
+      "files": 6,
+      "lines": 1000,
+      "parseMs": 1.1,
+      "renderMs": 33.9,
+      "totalMs": 35,
+      "runs": [
+        37.9,
+        33.6,
+        35
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.8,
+        "lagWorstMs": 10.9,
+        "durationMs": 1869.7,
+        "documentHeightPx": 20378
+      },
+      "memoryMB": 4,
+      "domNodes": 3260
+    },
+    {
+      "name": "synthetic-10k",
+      "label": "10k lines",
+      "layout": "unified",
+      "bytes": 430995,
+      "files": 43,
+      "lines": 10000,
+      "parseMs": 3.4,
+      "renderMs": 31,
+      "totalMs": 34,
+      "runs": [
+        34,
+        34,
+        40.7
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 10.8,
+        "durationMs": 1877.5,
+        "documentHeightPx": 206511
+      },
+      "memoryMB": 4,
+      "domNodes": 2348
+    },
+    {
+      "name": "synthetic-10k",
+      "label": "10k lines",
+      "layout": "split",
+      "bytes": 430995,
+      "files": 43,
+      "lines": 10000,
+      "parseMs": 3.3,
+      "renderMs": 29.7,
+      "totalMs": 33,
+      "runs": [
+        32.1,
+        37.9,
+        33
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 14,
+        "durationMs": 1877.8,
+        "documentHeightPx": 200791
+      },
+      "memoryMB": 5,
+      "domNodes": 3793
+    },
+    {
+      "name": "synthetic-50k",
+      "label": "50k lines",
+      "layout": "unified",
+      "bytes": 2149536,
+      "files": 205,
+      "lines": 50000,
+      "parseMs": 9.6,
+      "renderMs": 28.1,
+      "totalMs": 37.7,
+      "runs": [
+        37.3,
+        37.7,
+        42.2
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.7,
+        "lagWorstMs": 10.3,
+        "durationMs": 1869.2,
+        "documentHeightPx": 1031801
+      },
+      "memoryMB": 7,
+      "domNodes": 2080
+    },
+    {
+      "name": "synthetic-50k",
+      "label": "50k lines",
+      "layout": "split",
+      "bytes": 2149536,
+      "files": 205,
+      "lines": 50000,
+      "parseMs": 9.4,
+      "renderMs": 35.4,
+      "totalMs": 44.8,
+      "runs": [
+        50.6,
+        43.6,
+        44.8
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 5,
+        "lagWorstMs": 13.7,
+        "durationMs": 1866.2,
+        "documentHeightPx": 1008881
+      },
+      "memoryMB": 7,
+      "domNodes": 3152
+    },
+    {
+      "name": "synthetic-100k",
+      "label": "100k lines",
+      "layout": "unified",
+      "bytes": 4297571,
+      "files": 407,
+      "lines": 100000,
+      "parseMs": 17.5,
+      "renderMs": 31.5,
+      "totalMs": 49,
+      "runs": [
+        45.7,
+        49,
+        57.8
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 12.5,
+        "durationMs": 1865.3,
+        "documentHeightPx": 2063659
+      },
+      "memoryMB": 9,
+      "domNodes": 2224
+    },
+    {
+      "name": "synthetic-100k",
+      "label": "100k lines",
+      "layout": "split",
+      "bytes": 4297571,
+      "files": 407,
+      "lines": 100000,
+      "parseMs": 22,
+      "renderMs": 41.3,
+      "totalMs": 63.3,
+      "runs": [
+        79.2,
+        55.4,
+        63.3
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 5,
+        "lagWorstMs": 15,
+        "durationMs": 1882.2,
+        "documentHeightPx": 2018999
+      },
+      "memoryMB": 10,
+      "domNodes": 3439
+    },
+    {
+      "name": "synthetic-100k-edits",
+      "label": "100k lines of real edits",
+      "layout": "unified",
+      "bytes": 3835384,
+      "files": 397,
+      "lines": 100000,
+      "parseMs": 18.4,
+      "renderMs": 33.1,
+      "totalMs": 51.5,
+      "runs": [
+        51.5,
+        55.8,
+        46.4
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 10.5,
+        "durationMs": 1876,
+        "documentHeightPx": 2062641
+      },
+      "memoryMB": 9,
+      "domNodes": 2203
+    },
+    {
+      "name": "synthetic-100k-edits",
+      "label": "100k lines of real edits",
+      "layout": "split",
+      "bytes": 3835384,
+      "files": 397,
+      "lines": 100000,
+      "parseMs": 16.9,
+      "renderMs": 38,
+      "totalMs": 54.9,
+      "runs": [
+        60,
+        54.9,
+        52
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 5,
+        "lagWorstMs": 11.8,
+        "durationMs": 1875,
+        "documentHeightPx": 1963601
+      },
+      "memoryMB": 10,
+      "domNodes": 2687
+    },
+    {
+      "name": "real-kernel",
+      "label": "Linux kernel commit — 758 files",
+      "layout": "unified",
+      "bytes": 2121675,
+      "files": 758,
+      "lines": 62165,
+      "parseMs": 12.4,
+      "renderMs": 30.1,
+      "totalMs": 42.5,
+      "runs": [
+        43.7,
+        42.5,
+        42.2
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.8,
+        "lagWorstMs": 11,
+        "durationMs": 1877.8,
+        "documentHeightPx": 1316702
+      },
+      "memoryMB": 8,
+      "domNodes": 1567
+    },
+    {
+      "name": "real-kernel",
+      "label": "Linux kernel commit — 758 files",
+      "layout": "split",
+      "bytes": 2121675,
+      "files": 758,
+      "lines": 62165,
+      "parseMs": 12.2,
+      "renderMs": 38.1,
+      "totalMs": 50.3,
+      "runs": [
+        50.3,
+        52.1,
+        49.8
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 12.8,
+        "durationMs": 1869.9,
+        "documentHeightPx": 1249702
+      },
+      "memoryMB": 8,
+      "domNodes": 2009
+    },
+    {
+      "name": "real-minified",
+      "label": "Minified bundles — 371 KB in 128 lines",
+      "layout": "unified",
+      "bytes": 379969,
+      "files": 9,
+      "lines": 128,
+      "parseMs": 0.8,
+      "renderMs": 52.6,
+      "totalMs": 53.4,
+      "runs": [
+        53.4,
+        51.5,
+        53.7
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.4,
+        "lagWorstMs": 8.9,
+        "durationMs": 1882.6,
+        "documentHeightPx": 3133
+      },
+      "memoryMB": 3,
+      "domNodes": 1330
+    },
+    {
+      "name": "real-minified",
+      "label": "Minified bundles — 371 KB in 128 lines",
+      "layout": "split",
+      "bytes": 379969,
+      "files": 9,
+      "lines": 128,
+      "parseMs": 0.8,
+      "renderMs": 54.1,
+      "totalMs": 54.8,
+      "runs": [
+        54.8,
+        54.2,
+        55.2
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.5,
+        "lagWorstMs": 7.2,
+        "durationMs": 1866.7,
+        "documentHeightPx": 2853
+      },
+      "memoryMB": 3,
+      "domNodes": 1958
+    },
+    {
+      "name": "real-mass-rename",
+      "label": "168 files, mostly renames",
+      "layout": "unified",
+      "bytes": 461816,
+      "files": 168,
+      "lines": 5385,
+      "parseMs": 2.3,
+      "renderMs": 24.7,
+      "totalMs": 27,
+      "runs": [
+        28.4,
+        26.7,
+        27
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 16.6,
+        "durationMs": 1877.5,
+        "documentHeightPx": 123944
+      },
+      "memoryMB": 4,
+      "domNodes": 1749
+    },
+    {
+      "name": "real-mass-rename",
+      "label": "168 files, mostly renames",
+      "layout": "split",
+      "bytes": 461816,
+      "files": 168,
+      "lines": 5385,
+      "parseMs": 2.2,
+      "renderMs": 31,
+      "totalMs": 33.2,
+      "runs": [
+        30.1,
+        33.2,
+        38.3
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 17.8,
+        "durationMs": 1872.2,
+        "documentHeightPx": 118604
+      },
+      "memoryMB": 4,
+      "domNodes": 2222
+    }
+  ]
+}
