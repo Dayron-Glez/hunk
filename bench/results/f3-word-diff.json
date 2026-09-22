@@ -1,0 +1,93 @@
+{
+  "recordedAt": "2026-09-22T16:33:35.011Z",
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "cpus": "AMD Ryzen 7 5800H with Radeon Graphics",
+    "node": "v22.18.0"
+  },
+  "repeats": 3,
+  "results": [
+    {
+      "name": "synthetic-100k",
+      "label": "100k lines",
+      "bytes": 4297571,
+      "files": 407,
+      "lines": 100000,
+      "parseMs": 18.6,
+      "renderMs": 29.6,
+      "totalMs": 47.8,
+      "runs": [
+        49.3,
+        46.8,
+        47.8
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.8,
+        "lagWorstMs": 12.4,
+        "durationMs": 1873.5,
+        "documentHeightPx": 2063659
+      },
+      "memoryMB": 9,
+      "domNodes": 2219
+    },
+    {
+      "name": "synthetic-100k-edits",
+      "label": "100k lines of real edits",
+      "bytes": 3835384,
+      "files": 397,
+      "lines": 100000,
+      "parseMs": 18.5,
+      "renderMs": 29.6,
+      "totalMs": 48.1,
+      "runs": [
+        50.1,
+        48.1,
+        44.7
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.8,
+        "lagWorstMs": 11.6,
+        "durationMs": 1875.4,
+        "documentHeightPx": 2062641
+      },
+      "memoryMB": 9,
+      "domNodes": 2198
+    },
+    {
+      "name": "real-kernel",
+      "label": "Linux kernel commit — 758 files",
+      "bytes": 2121675,
+      "files": 758,
+      "lines": 62165,
+      "parseMs": 13,
+      "renderMs": 30,
+      "totalMs": 43,
+      "runs": [
+        45.7,
+        43,
+        42.2
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 11,
+        "durationMs": 1892.7,
+        "documentHeightPx": 1316702
+      },
+      "memoryMB": 7,
+      "domNodes": 1562
+    }
+  ]
+}
