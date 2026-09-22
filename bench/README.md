@@ -28,6 +28,7 @@ being measured.
 | `memory` | JavaScript heap after a forced garbage collection, from the browser rather than from inside the page. |
 | `DOM`    | Nodes in the document. The number virtualization exists to keep small.                                |
 | `layout` | Unified, or the two versions side by side. Every case is measured in both.                            |
+| `fold`   | One click on a fold control, from the click to the frame that follows it.                             |
 
 `total` is a median of three runs, each in a fresh page. Frame rate and memory come from the
 last run only — they need a live page, and repeating a three-second scroll three times triples
@@ -50,6 +51,19 @@ Snapshots recorded before F3 have no `layout` field. They are all unified.
 virtualization those were the same thing. They are not any more, and that is the entire point
 of the change rather than a softening of the measurement: what a reader waits for is the first
 screenful, and rows they have not scrolled to were never part of that wait.
+
+### What a fold costs
+
+Folding rebuilds the row projection and the height tree over whatever survives. That is one
+pass over every row of the diff, so the cost tracks the size of the document rather than how
+much was hidden — which is the claim the `fold` column exists to keep honest. The control it
+clicks is the one a reader clicks.
+
+It is measured with the same self-proving observer as the scroll, and getting that right took
+two tries. A long _animation frame_ is only reported when a frame happens, so the check that
+blocks the main thread on purpose has to block **inside** `requestAnimationFrame`. Blocking an
+idle page proves nothing and reports nothing, which is exactly how the first fold measurement
+came back with a zero that nothing stood behind.
 
 ### One thing the harness got wrong for a while
 
@@ -138,6 +152,7 @@ says what they are, and those _are_ committed:
 | `f2-highlighted.json`  | The same, with syntax highlighting arriving from a worker.                     |
 | `f3-word-diff.json`    | The same, marking what changed inside a line.                                  |
 | `f3-side-by-side.json` | Both layouts of every case, once the two-column view existed to measure.       |
+| `f4-folding.json`      | The same, with folding, expansion, the keyboard and the grid semantics.        |
 
 Copy `latest.json` to a new name whenever a run is worth keeping. Without that, the first run
 after a change destroys the number the change was supposed to be compared against.

@@ -44,7 +44,7 @@ export function DiffView({
               className={`px-2 py-0.5 first:rounded-l last:rounded-r ${
                 mode === option.mode
                   ? 'bg-neutral-800 text-neutral-100'
-                  : 'text-neutral-500 hover:text-neutral-300'
+                  : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
               {option.label}

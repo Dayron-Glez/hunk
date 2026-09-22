@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { createEvent, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readFixture } from '../../tests/fixtures'
+import { EXPAND_BY, Folding, LARGE_HUNK } from '../core/layout/folding'
 import { RowIndex } from '../core/layout/rowIndex'
 import { parseUnifiedDiff } from '../core/parse/unified'
 import { VirtualDiff } from './VirtualDiff'
@@ -118,10 +119,12 @@ describe('the empty case', () => {
 
 describe('two columns', () => {
   const rowsOf = (): HTMLElement[] => Array.from(list().children) as HTMLElement[]
-  const cellsOf = (row: HTMLElement) => ({
-    left: row.children[0]?.textContent ?? '',
-    right: row.children[1]?.textContent ?? '',
-  })
+  /** The two cells of a row, by role: each child of the list is the row
+   *  wrapper the grid needs, and the cells sit inside it. */
+  const cellsOf = (row: HTMLElement) => {
+    const cells = row.querySelectorAll('[role="gridcell"]')
+    return { left: cells[0]?.textContent ?? '', right: cells[1]?.textContent ?? '' }
+  }
 
   it('draws a replacement as one row with both versions on it', () => {
     globalThis.testViewportHeight = 100_000
@@ -152,10 +155,11 @@ describe('two columns', () => {
     render(<VirtualDiff diff={diffOf('vite-pr-23378-new-files.diff')} mode="split" />)
 
     // A new file is all insertions, so every line of it has an empty left cell
-    // rather than pulling the right column up by one.
+    // rather than pulling the right column up by one. The cell is empty to
+    // look at and says so out loud, which is why this checks the label.
     const gapped = rowsOf().filter((row) => {
       const cells = cellsOf(row)
-      return row.childElementCount === 2 && cells.left === '' && cells.right !== ''
+      return cells.left === 'No line here before.' && cells.right !== ''
     })
     expect(gapped.length).toBeGreaterThan(10)
   })
@@ -175,10 +179,532 @@ describe('two columns', () => {
       if (left === null || right === null) continue
       if (left.oldNumber === right.newNumber) continue
       const drawn = rowsOf()[row]
-      expect(drawn?.children[0]?.textContent).toContain(String(left.oldNumber))
-      expect(drawn?.children[1]?.textContent).toContain(String(right.newNumber))
+      expect(cellsOf(drawn!).left).toContain(String(left.oldNumber))
+      expect(cellsOf(drawn!).right).toContain(String(right.newNumber))
       checked += 1
     }
     expect(checked).toBeGreaterThan(0)
+  })
+})
+
+describe('folding', () => {
+  const rowTexts = (): string[] => Array.from(list().children).map((row) => row.textContent ?? '')
+
+  const chevrons = (): HTMLElement[] =>
+    screen.getAllByRole('button', { name: /^(Collapse|Expand) / })
+
+  it('takes a file down to its header and puts it back', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    const open = list().childElementCount
+    fireEvent.click(chevrons()[0]!)
+    const folded = list().childElementCount
+    expect(folded).toBeLessThan(open)
+
+    fireEvent.click(chevrons()[0]!)
+    expect(list().childElementCount).toBe(open)
+  })
+
+  it('leaves the hunk header behind when a hunk folds', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    const hunkChevron = screen.getAllByRole('button', { name: /^Collapse @@/ })[0]!
+    const before = rowTexts().filter((t) => t.startsWith('@@')).length
+    fireEvent.click(hunkChevron)
+
+    expect(rowTexts().filter((t) => t.startsWith('@@')).length).toBe(before)
+    expect(screen.getAllByRole('button', { name: /^Expand @@/ }).length).toBe(1)
+  })
+
+  it('says whether each control is expanded', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    const first = chevrons()[0]!
+    expect(first).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(first)
+    expect(chevrons()[0]!).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('still windows a folded document rather than rendering all of it', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+    fireEvent.click(chevrons()[0]!)
+    expect(list().childElementCount).toBeLessThan(100)
+  })
+})
+
+/**
+ * The reason folding is a projection over the index rather than a new index.
+ * A fold above the reader moves everything below it; if the scroll position
+ * does not move with it, the line they were reading slides away.
+ */
+describe('folding keeps the reader where they were', () => {
+  const chevronFor = (name: RegExp): HTMLElement => screen.getAllByRole('button', { name })[0]!
+
+  /** The row the viewport actually starts on. `children[0]` is overscan. */
+  const rowAtTop = (): string => {
+    const offset = Number.parseFloat(
+      /translateY\(([\d.]+)px\)/.exec(list().style.transform)?.[1] ?? '0',
+    )
+    const index = Math.round((scroller().scrollTop - offset) / globalThis.testRowHeight)
+    return list().children[index]?.textContent ?? ''
+  }
+
+  it('holds the top row still when a file above collapses', () => {
+    const diff = diffOf(BIG)
+    render(<VirtualDiff diff={diff} />)
+
+    const view = scroller()
+    view.scrollTop = 4_000
+    fireEvent.scroll(view)
+
+    const topBefore = rowAtTop()
+    const heightBefore = Number.parseFloat(list().parentElement!.style.height)
+    expect(topBefore).not.toBe('')
+
+    fireEvent.click(chevronFor(/^Collapse /))
+
+    // The document got shorter, so staying at 4.000 would show different rows.
+    expect(Number.parseFloat(list().parentElement!.style.height)).toBeLessThan(heightBefore)
+    expect(view.scrollTop).toBeLessThan(4_000)
+    expect(rowAtTop()).toBe(topBefore)
+  })
+
+  it('lands on the header of the file it just collapsed', () => {
+    const diff = diffOf('vite-pr-23378-new-files.diff')
+    globalThis.testViewportHeight = 200
+    render(<VirtualDiff diff={diff} />)
+
+    const view = scroller()
+    view.scrollTop = 600
+    fireEvent.scroll(view)
+
+    // Whichever file the reader is inside: collapsing it takes the anchor row
+    // away, and the nearest surviving row above it is that file's header.
+    const inside = list().children[0]?.textContent ?? ''
+    expect(inside).not.toBe('')
+
+    fireEvent.click(chevronFor(/^Collapse /))
+    expect(view.scrollTop).toBeGreaterThanOrEqual(0)
+    expect(list().childElementCount).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * A large hunk opens in chunks. The lines come from the diff itself — the
+ * GitHub-style "expand the unchanged context" needs the original file, which
+ * a .diff does not carry.
+ *
+ * Built here rather than taken from the corpus: the two fixtures with a hunk
+ * over the threshold are 5.818 and 64.807 rows, and laying either out in full
+ * under jsdom takes longer than the test is allowed. What the real ones hide
+ * is asserted against the model instead, in folding.test.ts.
+ */
+describe('expanding a hunk too large to show at once', () => {
+  const hunkOf = (lines: number) => {
+    const body = Array.from({ length: lines }, (_, i) => ` line ${i}`)
+    return parseUnifiedDiff(
+      [
+        'diff --git a/big.ts b/big.ts',
+        '--- a/big.ts',
+        '+++ b/big.ts',
+        `@@ -1,${lines} +1,${lines} @@`,
+        ...body,
+        '',
+      ].join(NEWLINE),
+    )
+  }
+
+  const expander = (): HTMLElement | undefined =>
+    screen.queryAllByRole('button', { name: /^Show \d+ more lines?$/ })[0]
+
+  beforeEach(() => {
+    globalThis.testViewportHeight = 100_000
+  })
+
+  it('shows the first chunk and offers the rest, counted', () => {
+    render(<VirtualDiff diff={hunkOf(LARGE_HUNK + 60)} />)
+
+    expect(expander()).toBeDefined()
+    expect(screen.getByText('60 lines not shown')).toBeInTheDocument()
+    // The file header, the hunk header, and the rows up to the threshold.
+    expect(list().childElementCount).toBe(LARGE_HUNK + 2)
+  })
+
+  it('shows them when asked, and stops offering', () => {
+    render(<VirtualDiff diff={hunkOf(LARGE_HUNK + 60)} />)
+    fireEvent.click(expander()!)
+
+    expect(list().childElementCount).toBe(LARGE_HUNK + 62)
+    expect(expander()).toBeUndefined()
+  })
+
+  it('opens a chunk at a time when more than a chunk is hidden', () => {
+    render(<VirtualDiff diff={hunkOf(LARGE_HUNK + EXPAND_BY * 2)} />)
+
+    expect(screen.getByRole('button', { name: `Show ${EXPAND_BY} more lines` })).toBeInTheDocument()
+    fireEvent.click(expander()!)
+
+    expect(list().childElementCount).toBe(LARGE_HUNK + EXPAND_BY + 2)
+    expect(expander()).toBeDefined()
+  })
+
+  it('offers the whole rest as well, for a reader who wants all of it', () => {
+    const hidden = EXPAND_BY * 3
+    render(<VirtualDiff diff={hunkOf(LARGE_HUNK + hidden)} />)
+
+    fireEvent.click(screen.getByRole('button', { name: `Show all ${hidden}` }))
+    expect(list().childElementCount).toBe(LARGE_HUNK + hidden + 2)
+    expect(expander()).toBeUndefined()
+  })
+
+  it('leaves a hunk under the threshold alone', () => {
+    render(<VirtualDiff diff={hunkOf(LARGE_HUNK - 1)} />)
+    expect(expander()).toBeUndefined()
+    expect(screen.queryByText(/not shown/)).not.toBeInTheDocument()
+  })
+
+  it('leaves the real fixtures of ordinary hunks alone', () => {
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+    expect(expander()).toBeUndefined()
+  })
+})
+
+const NEWLINE = String.fromCharCode(10)
+
+/**
+ * One tab stop for the whole diff, with the active row named rather than
+ * focused. A row the reader has scrolled past is not in the document to
+ * receive focus, so `aria-activedescendant` is what a virtualized grid has
+ * instead.
+ */
+describe('reading it with the keyboard', () => {
+  const grid = (): HTMLElement => screen.getByRole('grid')
+  const activeRow = (): HTMLElement | null => {
+    const id = grid().getAttribute('aria-activedescendant')
+    return id === null ? null : document.getElementById(id)
+  }
+  const press = (key: string): void => {
+    fireEvent.keyDown(grid(), { key })
+  }
+
+  it('is one tab stop, and says how many rows it has', () => {
+    const diff = diffOf(BIG)
+    render(<VirtualDiff diff={diff} />)
+
+    expect(grid()).toHaveAttribute('tabindex', '0')
+    expect(grid()).toHaveAttribute(
+      'aria-rowcount',
+      String(Folding.initial(new RowIndex(diff)).length),
+    )
+    // Far more rows than are in the document, which is the point of saying it.
+    expect(list().childElementCount).toBeLessThan(100)
+  })
+
+  it('numbers each rendered row by its place in the whole diff', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+    const view = scroller()
+    view.scrollTop = 4_000
+    fireEvent.scroll(view)
+
+    const indices = Array.from(list().children).map((row) =>
+      Number(row.getAttribute('aria-rowindex')),
+    )
+    expect(indices[0]).toBeGreaterThan(1)
+    for (let i = 1; i < indices.length; i += 1) expect(indices[i]).toBe(indices[i - 1]! + 1)
+  })
+
+  it('names nothing before a key is pressed', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+    expect(grid()).not.toHaveAttribute('aria-activedescendant')
+  })
+
+  it('walks a row at a time, with the arrows or with j and k', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+
+    press('ArrowDown')
+    const first = activeRow()?.getAttribute('aria-rowindex')
+    press('j')
+    expect(activeRow()?.getAttribute('aria-rowindex')).toBe(String(Number(first) + 1))
+    press('k')
+    expect(activeRow()?.getAttribute('aria-rowindex')).toBe(first)
+    press('ArrowUp')
+    expect(Number(activeRow()?.getAttribute('aria-rowindex'))).toBe(Number(first) - 1)
+  })
+
+  it('jumps between files with the brackets', () => {
+    const diff = diffOf(BIG)
+    render(<VirtualDiff diff={diff} />)
+
+    press(']')
+    const after = activeRow()
+    expect(after?.textContent).toContain('modified')
+    press(']')
+    expect(Number(activeRow()?.getAttribute('aria-rowindex'))).toBeGreaterThan(
+      Number(after?.getAttribute('aria-rowindex')),
+    )
+  })
+
+  it('jumps between hunks with n and p', () => {
+    render(<VirtualDiff diff={diffOf('vite-pr-23378-new-files.diff')} />)
+
+    press('n')
+    const first = Number(activeRow()?.getAttribute('aria-rowindex'))
+    press('n')
+    const second = Number(activeRow()?.getAttribute('aria-rowindex'))
+    expect(second).toBeGreaterThan(first)
+    press('p')
+    expect(Number(activeRow()?.getAttribute('aria-rowindex'))).toBe(first)
+  })
+
+  it('goes to the ends of the diff', () => {
+    const diff = diffOf(BIG)
+    render(<VirtualDiff diff={diff} />)
+
+    press('End')
+    expect(Number(activeRow()?.getAttribute('aria-rowindex'))).toBe(
+      Folding.initial(new RowIndex(diff)).length,
+    )
+    press('Home')
+    expect(Number(activeRow()?.getAttribute('aria-rowindex'))).toBe(1)
+  })
+
+  it('scrolls the row it moved to into view', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+    const view = scroller()
+    expect(view.scrollTop).toBe(0)
+
+    press('End')
+    expect(view.scrollTop).toBeGreaterThan(0)
+    // Named only while it is rendered, which after a jump it is.
+    expect(activeRow()).not.toBeNull()
+  })
+
+  it('folds and unfolds the row it is on', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+
+    press('ArrowDown')
+    press('Home')
+    const before = list().childElementCount
+
+    press('Enter')
+    expect(screen.getAllByRole('button', { name: /^Expand / })[0]).toBeDefined()
+    press('Enter')
+    expect(list().childElementCount).toBe(before)
+  })
+
+  it('leaves a line row alone when told to fold it', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+    const view = scroller()
+    view.scrollTop = 4_000
+    fireEvent.scroll(view)
+
+    press('ArrowDown')
+    const before = list().childElementCount
+    press('Enter')
+    expect(list().childElementCount).toBe(before)
+  })
+
+  it('ignores keys meant for the browser', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+    press('ArrowDown')
+    const before = activeRow()?.getAttribute('aria-rowindex')
+
+    fireEvent.keyDown(grid(), { key: 'ArrowDown', metaKey: true })
+    fireEvent.keyDown(grid(), { key: 'q' })
+    expect(activeRow()?.getAttribute('aria-rowindex')).toBe(before)
+  })
+
+  it('does not hijack a key pressed on a fold button', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    const button = screen.getAllByRole('button', { name: /^Collapse / })[0]!
+    fireEvent.keyDown(button, { key: 'ArrowDown', bubbles: true })
+    expect(grid()).not.toHaveAttribute('aria-activedescendant')
+  })
+})
+
+/**
+ * What a reader who cannot see the screen gets, and what virtualization
+ * costs them.
+ */
+describe('reading it without seeing it', () => {
+  const grid = (): HTMLElement => screen.getByRole('grid')
+
+  it('says what each line is, since the gutter is hidden', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    expect(screen.getAllByText(/^Added line \d+\.$/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/^Removed line \d+\.$/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/^Line \d+\.$/).length).toBeGreaterThan(0)
+  })
+
+  it('keeps those labels out of the clipboard', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    // `sr-only` still copies with a selection; `select-none` is what stops it,
+    // so a copied block of the diff is code rather than code plus commentary.
+    for (const label of screen.getAllByText(/^Added line \d+\.$/)) {
+      expect(label.className).toContain('select-none')
+    }
+  })
+
+  it('names the empty half of a two-column row', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23378-new-files.diff')} mode="split" />)
+    expect(screen.getAllByText('No line here before.').length).toBeGreaterThan(0)
+  })
+
+  it('gives every row at least one cell', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    for (const row of Array.from(list().children)) {
+      expect(row.getAttribute('role')).toBe('row')
+      expect(row.querySelectorAll('[role="gridcell"]').length).toBeGreaterThan(0)
+    }
+  })
+
+  it('gives a two-column row two cells', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+
+    const lineRows = Array.from(list().children).filter(
+      (row) => row.querySelectorAll('[role="gridcell"]').length === 2,
+    )
+    expect(lineRows.length).toBeGreaterThan(10)
+  })
+
+  /**
+   * The cost of virtualization, stated rather than hidden: a screen reader can
+   * only reach the rows that exist. `aria-rowcount` and `aria-rowindex` are
+   * what make that navigable instead of merely broken — the reader is told
+   * there are 5.647 rows and which one they are on, and the keyboard brings
+   * any of them into the document.
+   */
+  it('admits how many rows there are when almost none of them exist', () => {
+    const diff = diffOf(BIG)
+    render(<VirtualDiff diff={diff} />)
+
+    const total = Folding.initial(new RowIndex(diff)).length
+    expect(Number(grid().getAttribute('aria-rowcount'))).toBe(total)
+    expect(list().childElementCount).toBeLessThan(total / 20)
+  })
+
+  it('keeps the row controls out of the tab order', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    // Tabbing a virtualized list would walk a set that rearranges itself as it
+    // scrolls, and whose length depends on the viewport. The grid is the one
+    // stop; Enter on the active row does what the buttons do.
+    for (const button of screen.getAllByRole('button')) {
+      expect(button).toHaveAttribute('tabindex', '-1')
+    }
+    expect(grid()).toHaveAttribute('tabindex', '0')
+  })
+
+  it('keeps a visible focus indicator on the one thing that takes focus', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+    expect(grid().className).not.toContain('focus:outline-none')
+    expect(grid().className).toContain('focus-visible:outline-2')
+  })
+
+  it('says out loud what a keystroke folded', () => {
+    render(<VirtualDiff diff={diffOf(BIG)} />)
+    const live = grid().querySelector('[aria-live="polite"]')!
+    expect(live.textContent).toBe('')
+
+    fireEvent.keyDown(grid(), { key: 'Home' })
+    fireEvent.keyDown(grid(), { key: 'Enter' })
+    expect(live.textContent).toMatch(/Collapsed file\./)
+
+    fireEvent.keyDown(grid(), { key: 'Enter' })
+    expect(live.textContent).toMatch(/Expanded file\./)
+  })
+
+  it('reaches the expander from the keyboard, since it is not tabbable', () => {
+    globalThis.testViewportHeight = 100_000
+    const lines = LARGE_HUNK + 60
+    const diff = parseUnifiedDiff(
+      [
+        'diff --git a/big.ts b/big.ts',
+        '--- a/big.ts',
+        '+++ b/big.ts',
+        `@@ -1,${lines} +1,${lines} @@`,
+        ...Array.from({ length: lines }, (_, i) => ` line ${i}`),
+        '',
+      ].join(String.fromCharCode(10)),
+    )
+    render(<VirtualDiff diff={diff} />)
+
+    const before = list().childElementCount
+    // One file, one hunk: the last row shown is the truncated one.
+    fireEvent.keyDown(grid(), { key: 'End' })
+    fireEvent.keyDown(grid(), { key: 'Enter' })
+
+    expect(list().childElementCount).toBe(before + 60)
+    expect(grid().querySelector('[aria-live="polite"]')?.textContent).toMatch(
+      /Showed 60 more lines\./,
+    )
+  })
+})
+
+/**
+ * A scrollable box is a tab stop in Chrome, so the browser can scroll it from
+ * the keyboard. Inside a virtualized list that puts a stop on every long line
+ * on screen, in a set that rearranges itself as it scrolls — 18 of them in 37
+ * rows on a real diff. The grid stays the one stop and pans them instead.
+ */
+describe('long lines in two columns', () => {
+  const grid = (): HTMLElement => screen.getByRole('grid')
+
+  const panes = (): HTMLElement[] => Array.from(list().querySelectorAll<HTMLElement>('[data-pan]'))
+
+  it('keeps the scrollable cells out of the tab order', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+
+    expect(panes().length).toBeGreaterThan(10)
+    for (const pane of panes()) expect(pane).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('pans the row the reader is on with left and right', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+
+    fireEvent.keyDown(grid(), { key: 'Home' })
+    fireEvent.keyDown(grid(), { key: 'j' })
+    fireEvent.keyDown(grid(), { key: 'j' })
+
+    const id = grid().getAttribute('aria-activedescendant')!
+    const row = document.getElementById(id)!
+    const pane = row.querySelector<HTMLElement>('[data-pan]')!
+    expect(pane.scrollLeft).toBe(0)
+
+    fireEvent.keyDown(grid(), { key: 'ArrowRight' })
+    expect(pane.scrollLeft).toBeGreaterThan(0)
+
+    fireEvent.keyDown(grid(), { key: 'ArrowLeft' })
+    expect(pane.scrollLeft).toBe(0)
+  })
+
+  it('leaves the arrows to the browser in one column, where the grid scrolls', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+
+    fireEvent.keyDown(grid(), { key: 'Home' })
+    fireEvent.keyDown(grid(), { key: 'j' })
+
+    // Nothing to pan: a unified row has no cell of its own to scroll, so the
+    // event is not taken and the scroller handles it natively.
+    const event = createEvent.keyDown(grid(), { key: 'ArrowRight' })
+    fireEvent(grid(), event)
+    expect(event.defaultPrevented).toBe(false)
   })
 })

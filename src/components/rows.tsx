@@ -9,9 +9,21 @@ const STATUS_STYLES: Record<DiffFile['status'], string> = {
   copied: 'bg-violet-500/15 text-violet-300',
 }
 
-export function FileHeaderRow({ file }: { readonly file: DiffFile }) {
+export function FileHeaderRow({
+  file,
+  collapsed,
+  onToggle,
+}: {
+  readonly file: DiffFile
+  readonly collapsed: boolean
+  readonly onToggle: () => void
+}) {
   return (
-    <div className="flex w-max min-w-full flex-wrap items-center gap-x-3 gap-y-1 border-t border-neutral-800 bg-neutral-900 px-3 py-2">
+    <div
+      role="gridcell"
+      className="flex w-max min-w-full flex-wrap items-center gap-x-3 gap-y-1 border-t border-neutral-800 bg-neutral-900 px-3 py-2"
+    >
+      <Chevron collapsed={collapsed} onToggle={onToggle} label={describePath(file)} />
       <span className={`rounded px-1.5 py-0.5 text-[11px] ${STATUS_STYLES[file.status]}`}>
         {file.status}
       </span>
@@ -30,17 +42,124 @@ export function FileHeaderRow({ file }: { readonly file: DiffFile }) {
   )
 }
 
-export function HunkHeaderRow({ hunk }: { readonly hunk: Hunk }) {
+export function HunkHeaderRow({
+  hunk,
+  collapsed,
+  onToggle,
+}: {
+  readonly hunk: Hunk
+  readonly collapsed: boolean
+  readonly onToggle: () => void
+}) {
+  const range = `@@ -${hunk.oldStart},${hunk.oldCount} +${hunk.newStart},${hunk.newCount} @@`
   return (
-    <div className="w-max min-w-full bg-sky-500/10 px-3 py-1 font-mono text-xs text-sky-300/70 select-none">
-      @@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
-      {hunk.section === '' ? '' : ` ${hunk.section}`}
+    <div
+      role="gridcell"
+      className="flex w-max min-w-full items-center gap-2 bg-sky-500/10 px-3 py-1 font-mono text-xs text-sky-300/70"
+    >
+      <Chevron collapsed={collapsed} onToggle={onToggle} label={range} />
+      <span className="select-none">
+        {range}
+        {hunk.section === '' ? '' : ` ${hunk.section}`}
+      </span>
     </div>
   )
 }
 
 export function NoteRow({ file }: { readonly file: DiffFile }) {
   return (
-    <p className="w-max min-w-full px-3 py-4 text-sm text-neutral-500">{describeEmptyBody(file)}</p>
+    <p role="gridcell" className="w-max min-w-full px-3 py-4 text-sm text-neutral-500">
+      {describeEmptyBody(file)}
+    </p>
+  )
+}
+
+/**
+ * The fold control.
+ *
+ * A button rather than a click handler on the whole header: the header holds a
+ * path a reader may want to select, and a row that folds when you try to copy
+ * from it is worse than one that needs aiming at. The label says what it
+ * folds, because "collapse" repeated eight hundred times down a kernel commit
+ * tells a screen reader nothing.
+ *
+ * Out of the tab order on purpose. Only the rows on screen exist, so tabbing
+ * would walk a list that rearranges itself under the reader as it scrolls,
+ * and its length would depend on the viewport. The grid is one tab stop and
+ * Enter on the focused row does this, which is the pattern a grid is supposed
+ * to follow anyway.
+ */
+function Chevron({
+  collapsed,
+  onToggle,
+  label,
+}: {
+  readonly collapsed: boolean
+  readonly onToggle: () => void
+  readonly label: string
+}) {
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      onClick={onToggle}
+      aria-expanded={!collapsed}
+      aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
+      className="shrink-0 rounded px-1 text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-200"
+    >
+      <span aria-hidden className="inline-block w-3 text-center">
+        {collapsed ? '›' : '⌄'}
+      </span>
+    </button>
+  )
+}
+
+/**
+ * What sits under the last row of a hunk that is not being shown in full.
+ *
+ * Two controls rather than one: a reader working through a long hunk wants
+ * the next screenful, and a reader who has decided they need all of it should
+ * not have to click ten times to say so. The count is spelled out because
+ * "show more" without a number hides how much is being withheld.
+ */
+export function ExpanderRow({
+  hidden,
+  chunk,
+  onExpand,
+  onExpandAll,
+}: {
+  readonly hidden: number
+  readonly chunk: number
+  readonly onExpand: () => void
+  readonly onExpandAll: () => void
+}) {
+  const next = Math.min(chunk, hidden)
+  return (
+    <div
+      role="gridcell"
+      className="flex w-max min-w-full items-center gap-3 border-y border-neutral-800 bg-neutral-900/60 px-3 py-1.5 text-xs"
+    >
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={onExpand}
+        className="rounded border border-neutral-700 px-2 py-0.5 text-neutral-300 hover:bg-neutral-700/50"
+      >
+        Show {next.toLocaleString('en-US')} more {next === 1 ? 'line' : 'lines'}
+      </button>
+      {hidden > next ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={onExpandAll}
+          className="rounded px-2 py-0.5 text-neutral-400 hover:text-neutral-200"
+        >
+          Show all {hidden.toLocaleString('en-US')}
+        </button>
+      ) : null}
+      <span className="text-neutral-400">
+        {hidden.toLocaleString('en-US')} {hidden === 1 ? 'line' : 'lines'} not shown
+      </span>
+    </div>
   )
 }

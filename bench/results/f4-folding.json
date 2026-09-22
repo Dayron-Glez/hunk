@@ -1,0 +1,572 @@
+{
+  "recordedAt": "2026-09-22T23:07:13.090Z",
+  "machine": {
+    "platform": "win32",
+    "arch": "x64",
+    "cpus": "AMD Ryzen 7 5800H with Radeon Graphics",
+    "node": "v22.18.0"
+  },
+  "repeats": 3,
+  "results": [
+    {
+      "name": "synthetic-1k",
+      "label": "1k lines",
+      "layout": "unified",
+      "bytes": 42367,
+      "files": 6,
+      "lines": 1000,
+      "parseMs": 1.1,
+      "renderMs": 34.6,
+      "totalMs": 35.5,
+      "runs": [
+        42.1,
+        34.8,
+        35.5
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.7,
+        "lagWorstMs": 10.6,
+        "durationMs": 1883.8,
+        "documentHeightPx": 20798
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 6,
+        "rowsBefore": 1030,
+        "rowsAfter": 997
+      },
+      "memoryMB": 4,
+      "domNodes": 2523
+    },
+    {
+      "name": "synthetic-1k",
+      "label": "1k lines",
+      "layout": "split",
+      "bytes": 42367,
+      "files": 6,
+      "lines": 1000,
+      "parseMs": 1.1,
+      "renderMs": 41.4,
+      "totalMs": 42.5,
+      "runs": [
+        39.5,
+        42.5,
+        43.9
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.7,
+        "lagWorstMs": 15.4,
+        "durationMs": 1869.2,
+        "documentHeightPx": 20378
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 9.1,
+        "rowsBefore": 1009,
+        "rowsAfter": 977
+      },
+      "memoryMB": 4,
+      "domNodes": 3907
+    },
+    {
+      "name": "synthetic-10k",
+      "label": "10k lines",
+      "layout": "unified",
+      "bytes": 430995,
+      "files": 43,
+      "lines": 10000,
+      "parseMs": 3.1,
+      "renderMs": 43.8,
+      "totalMs": 47.1,
+      "runs": [
+        43.1,
+        47.1,
+        51.6
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 23.1,
+        "durationMs": 1882.6,
+        "documentHeightPx": 206511
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 10.1,
+        "rowsBefore": 10248,
+        "rowsAfter": 10190
+      },
+      "memoryMB": 4,
+      "domNodes": 2450
+    },
+    {
+      "name": "synthetic-10k",
+      "label": "10k lines",
+      "layout": "split",
+      "bytes": 430995,
+      "files": 43,
+      "lines": 10000,
+      "parseMs": 3.3,
+      "renderMs": 45,
+      "totalMs": 48.3,
+      "runs": [
+        48.3,
+        44.9,
+        50.6
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 5,
+        "lagWorstMs": 21,
+        "durationMs": 1887.4,
+        "documentHeightPx": 200791
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 11.8,
+        "rowsBefore": 9962,
+        "rowsAfter": 9905
+      },
+      "memoryMB": 5,
+      "domNodes": 3817
+    },
+    {
+      "name": "synthetic-50k",
+      "label": "50k lines",
+      "layout": "unified",
+      "bytes": 2149536,
+      "files": 205,
+      "lines": 50000,
+      "parseMs": 9.4,
+      "renderMs": 44.3,
+      "totalMs": 53.7,
+      "runs": [
+        53,
+        53.7,
+        58.2
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.8,
+        "lagWorstMs": 13.3,
+        "durationMs": 1874.9,
+        "documentHeightPx": 1031801
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 13.7,
+        "rowsBefore": 51214,
+        "rowsAfter": 51152
+      },
+      "memoryMB": 7,
+      "domNodes": 2303
+    },
+    {
+      "name": "synthetic-50k",
+      "label": "50k lines",
+      "layout": "split",
+      "bytes": 2149536,
+      "files": 205,
+      "lines": 50000,
+      "parseMs": 9.4,
+      "renderMs": 57.1,
+      "totalMs": 66.5,
+      "runs": [
+        69.1,
+        62.5,
+        66.5
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 5,
+        "lagWorstMs": 16.5,
+        "durationMs": 1890.7,
+        "documentHeightPx": 1008881
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 21,
+        "rowsBefore": 50068,
+        "rowsAfter": 50007
+      },
+      "memoryMB": 7,
+      "domNodes": 3661
+    },
+    {
+      "name": "synthetic-100k",
+      "label": "100k lines",
+      "layout": "unified",
+      "bytes": 4297571,
+      "files": 407,
+      "lines": 100000,
+      "parseMs": 16,
+      "renderMs": 48,
+      "totalMs": 63.6,
+      "runs": [
+        64.8,
+        62.5,
+        63.6
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 24.4,
+        "durationMs": 1891.6,
+        "documentHeightPx": 2063659
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 22.5,
+        "rowsBefore": 102432,
+        "rowsAfter": 102378
+      },
+      "memoryMB": 10,
+      "domNodes": 2517
+    },
+    {
+      "name": "synthetic-100k",
+      "label": "100k lines",
+      "layout": "split",
+      "bytes": 4297571,
+      "files": 407,
+      "lines": 100000,
+      "parseMs": 17.3,
+      "renderMs": 59.3,
+      "totalMs": 76.6,
+      "runs": [
+        91.1,
+        76.6,
+        74.9
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 5,
+        "lagWorstMs": 17.1,
+        "durationMs": 1878.8,
+        "documentHeightPx": 2018999
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 22.6,
+        "rowsBefore": 100199,
+        "rowsAfter": 100146
+      },
+      "memoryMB": 10,
+      "domNodes": 3888
+    },
+    {
+      "name": "synthetic-100k-edits",
+      "label": "100k lines of real edits",
+      "layout": "unified",
+      "bytes": 3835384,
+      "files": 397,
+      "lines": 100000,
+      "parseMs": 16.9,
+      "renderMs": 46.9,
+      "totalMs": 64,
+      "runs": [
+        64.3,
+        63.7,
+        64
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.8,
+        "lagWorstMs": 12.4,
+        "durationMs": 1873.1,
+        "documentHeightPx": 2062641
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 22.6,
+        "rowsBefore": 102395,
+        "rowsAfter": 102319
+      },
+      "memoryMB": 10,
+      "domNodes": 2489
+    },
+    {
+      "name": "synthetic-100k-edits",
+      "label": "100k lines of real edits",
+      "layout": "split",
+      "bytes": 3835384,
+      "files": 397,
+      "lines": 100000,
+      "parseMs": 16.4,
+      "renderMs": 57.6,
+      "totalMs": 74,
+      "runs": [
+        73,
+        74,
+        75.8
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 15.1,
+        "durationMs": 1872.8,
+        "documentHeightPx": 1963601
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 24.5,
+        "rowsBefore": 97443,
+        "rowsAfter": 97373
+      },
+      "memoryMB": 10,
+      "domNodes": 3181
+    },
+    {
+      "name": "real-kernel",
+      "label": "Linux kernel commit — 758 files",
+      "layout": "unified",
+      "bytes": 2121675,
+      "files": 758,
+      "lines": 62165,
+      "parseMs": 12.8,
+      "renderMs": 50.2,
+      "totalMs": 63,
+      "runs": [
+        66.6,
+        62.2,
+        63
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.7,
+        "lagWorstMs": 23.5,
+        "durationMs": 1878.2,
+        "documentHeightPx": 1122562
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 9.8,
+        "rowsBefore": 55100,
+        "rowsAfter": 55091
+      },
+      "memoryMB": 8,
+      "domNodes": 1770
+    },
+    {
+      "name": "real-kernel",
+      "label": "Linux kernel commit — 758 files",
+      "layout": "split",
+      "bytes": 2121675,
+      "files": 758,
+      "lines": 62165,
+      "parseMs": 12.2,
+      "renderMs": 57.7,
+      "totalMs": 69.9,
+      "runs": [
+        69.6,
+        71.1,
+        69.9
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 28.9,
+        "durationMs": 1889,
+        "documentHeightPx": 1055562
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 13.3,
+        "rowsBefore": 51750,
+        "rowsAfter": 51249
+      },
+      "memoryMB": 8,
+      "domNodes": 1902
+    },
+    {
+      "name": "real-minified",
+      "label": "Minified bundles — 371 KB in 128 lines",
+      "layout": "unified",
+      "bytes": 379969,
+      "files": 9,
+      "lines": 128,
+      "parseMs": 0.8,
+      "renderMs": 67.6,
+      "totalMs": 68.4,
+      "runs": [
+        76.8,
+        66.1,
+        68.4
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.6,
+        "lagWorstMs": 8.6,
+        "durationMs": 1901.6,
+        "documentHeightPx": 3133
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 4.9,
+        "rowsBefore": 147,
+        "rowsAfter": 130
+      },
+      "memoryMB": 3,
+      "domNodes": 1624
+    },
+    {
+      "name": "real-minified",
+      "label": "Minified bundles — 371 KB in 128 lines",
+      "layout": "split",
+      "bytes": 379969,
+      "files": 9,
+      "lines": 128,
+      "parseMs": 0.9,
+      "renderMs": 70.6,
+      "totalMs": 71.4,
+      "runs": [
+        71.3,
+        74.1,
+        71.4
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.6,
+        "lagWorstMs": 8.9,
+        "durationMs": 1877.1,
+        "documentHeightPx": 2853
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 16.5,
+        "rowsBefore": 133,
+        "rowsAfter": 116
+      },
+      "memoryMB": 4,
+      "domNodes": 2333
+    },
+    {
+      "name": "real-mass-rename",
+      "label": "168 files, mostly renames",
+      "layout": "unified",
+      "bytes": 461816,
+      "files": 168,
+      "lines": 5385,
+      "parseMs": 2.5,
+      "renderMs": 38.8,
+      "totalMs": 41.1,
+      "runs": [
+        40.9,
+        41.1,
+        50.4
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.8,
+        "lagWorstMs": 23.7,
+        "durationMs": 1866.6,
+        "documentHeightPx": 120524
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 9.2,
+        "rowsBefore": 5647,
+        "rowsAfter": 5635
+      },
+      "memoryMB": 4,
+      "domNodes": 1962
+    },
+    {
+      "name": "real-mass-rename",
+      "label": "168 files, mostly renames",
+      "layout": "split",
+      "bytes": 461816,
+      "files": 168,
+      "lines": 5385,
+      "parseMs": 2.9,
+      "renderMs": 53.5,
+      "totalMs": 56.4,
+      "runs": [
+        60.6,
+        56.4,
+        51.3
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.9,
+        "lagWorstMs": 32.7,
+        "durationMs": 1891.3,
+        "documentHeightPx": 115364
+      },
+      "fold": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "wallMs": 11.3,
+        "rowsBefore": 5389,
+        "rowsAfter": 5343
+      },
+      "memoryMB": 4,
+      "domNodes": 3122
+    }
+  ]
+}

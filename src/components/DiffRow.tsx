@@ -20,6 +20,20 @@ const MARKER_STYLES: Record<DiffLine['kind'], string> = {
   delete: 'text-rose-400',
 }
 
+/**
+ * What a screen reader hears in place of the gutter.
+ *
+ * The gutter itself is hidden from them: read literally it is two bare
+ * numbers and a punctuation mark. `select-none` keeps this out of the
+ * clipboard, so copying a block of the diff still yields code.
+ */
+function spokenLabel(line: DiffLine, number: number | null): string {
+  const where = number === null ? '' : ` ${number}`
+  if (line.kind === 'insert') return `Added line${where}.`
+  if (line.kind === 'delete') return `Removed line${where}.`
+  return `Line${where}.`
+}
+
 const CHANGED_STYLES: Record<DiffLine['kind'], string> = {
   context: '',
   insert: 'bg-emerald-400/25 rounded-[2px]',
@@ -34,17 +48,23 @@ export function DiffRow({
   readonly segments: readonly Segment[] | null
 }) {
   return (
-    <div className={`flex min-h-5 w-max min-w-full leading-5 ${ROW_STYLES[line.kind]}`}>
+    <div
+      role="gridcell"
+      className={`flex min-h-5 w-max min-w-full leading-5 ${ROW_STYLES[line.kind]}`}
+    >
       {/* Sticky so the numbers stay put while a long line scrolls, and unselectable
           so copying a block of the diff yields code rather than code plus gutters. */}
+      <span className="sr-only select-none">
+        {spokenLabel(line, line.newNumber ?? line.oldNumber)}
+      </span>
       <div
         className={`sticky left-0 z-10 flex select-none ${ROW_STYLES[line.kind]} bg-neutral-950`}
         aria-hidden
       >
-        <span className="w-12 shrink-0 pr-2 text-right text-neutral-600 tabular-nums">
+        <span className="w-12 shrink-0 pr-2 text-right text-neutral-400 tabular-nums">
           {line.oldNumber}
         </span>
-        <span className="w-12 shrink-0 pr-2 text-right text-neutral-600 tabular-nums">
+        <span className="w-12 shrink-0 pr-2 text-right text-neutral-400 tabular-nums">
           {line.newNumber}
         </span>
         <span className={`w-4 shrink-0 text-center ${MARKER_STYLES[line.kind]}`}>
@@ -81,7 +101,8 @@ export function SplitDiffRow({
   readonly newSegments: readonly Segment[] | null
 }) {
   return (
-    <div className="flex min-h-5 leading-5">
+    // Presentational: the two cells below are what the grid sees as cells.
+    <div role="presentation" className="flex min-h-5 leading-5">
       <SplitCell line={oldLine} segments={oldSegments} column="old" />
       <SplitCell line={newLine} segments={newSegments} column="new" />
     </div>
@@ -109,13 +130,22 @@ function SplitCell({
   const edge = column === 'old' ? 'border-r border-neutral-800' : ''
 
   if (line === null) {
-    return <div className={`w-1/2 shrink-0 bg-neutral-900/40 ${edge}`} aria-hidden />
+    return (
+      <div role="gridcell" className={`w-1/2 shrink-0 bg-neutral-900/40 ${edge}`}>
+        <span className="sr-only select-none">
+          {column === 'old' ? 'No line here before.' : 'No line here after.'}
+        </span>
+      </div>
+    )
   }
 
   return (
-    <div className={`flex w-1/2 shrink-0 ${ROW_STYLES[line.kind]} ${edge}`}>
+    <div role="gridcell" className={`flex w-1/2 shrink-0 ${ROW_STYLES[line.kind]} ${edge}`}>
+      <span className="sr-only select-none">
+        {spokenLabel(line, column === 'old' ? line.oldNumber : line.newNumber)}
+      </span>
       <span
-        className="w-12 shrink-0 pr-2 text-right text-neutral-600 tabular-nums select-none"
+        className="w-12 shrink-0 pr-2 text-right text-neutral-400 tabular-nums select-none"
         aria-hidden
       >
         {column === 'old' ? line.oldNumber : line.newNumber}
@@ -126,7 +156,16 @@ function SplitCell({
       >
         {MARKERS[line.kind]}
       </span>
-      <span className="min-w-0 flex-1 [scrollbar-width:none] overflow-x-auto whitespace-pre text-neutral-200 [&::-webkit-scrollbar]:hidden">
+      {/* Chrome makes a scrollable box a tab stop so it can be scrolled by
+          keyboard. Here that would put a stop on every long line on screen, in
+          a list that rearranges itself as it scrolls — 18 of them in 37 rows on
+          a real diff. The grid is the one stop, and its left and right arrows
+          pan this instead. */}
+      <span
+        tabIndex={-1}
+        data-pan
+        className="min-w-0 flex-1 [scrollbar-width:none] overflow-x-auto whitespace-pre text-neutral-200 outline-none [&::-webkit-scrollbar]:hidden"
+      >
         <LineContent line={line} segments={segments} />
         {line.noNewlineAtEof ? (
           <span className="pl-4 text-neutral-500 italic select-none">no newline</span>

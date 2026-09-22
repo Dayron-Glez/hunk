@@ -37,11 +37,31 @@ interface ScrollReport {
   readonly documentHeightPx: number
 }
 
+/**
+ * What one fold costs.
+ *
+ * Folding rebuilds the row projection and the height tree over whatever
+ * survives, on a click. The rebuild is one pass over every row of the diff,
+ * so its cost depends on the size of the document rather than on how much was
+ * hidden — which is the claim this measures.
+ */
+interface FoldReport {
+  /** Same self-check as the scroll report: a zero from a missing instrument
+   *  is worse than no number at all. */
+  readonly blockingMeasurable: boolean
+  readonly blockingMs: number
+  /** Wall clock from the click to the next frame after it. */
+  readonly wallMs: number
+  readonly rowsBefore: number
+  readonly rowsAfter: number
+}
+
 declare global {
   interface Window {
     __bench?: {
       timings: BenchTimings | null
       measureScroll: () => Promise<ScrollReport>
+      measureFold: () => Promise<FoldReport | null>
     }
   }
 }
@@ -54,7 +74,7 @@ if (caseName === null) throw new Error('bench harness needs a ?case= parameter')
 // paint measured after a toggle would be measuring the toggle.
 const mode: LayoutMode = params.get('mode') === 'split' ? 'split' : 'unified'
 
-window.__bench = { timings: null, measureScroll }
+window.__bench = { timings: null, measureScroll, measureFold }
 
 const startedAt = performance.now()
 const source = await fetch(`./cases/${caseName}.diff`).then((response) => response.text())
@@ -182,16 +202,78 @@ async function measureScroll(): Promise<ScrollReport> {
 }
 
 /**
+ * Collapse the first file and time it.
+ *
+ * One fold, from the control a reader actually clicks. Which file barely
+ * matters: the projection is rebuilt in a single pass over every row of the
+ * diff whatever is hidden, so this measures the rebuild.
+ */
+async function measureFold(): Promise<FoldReport | null> {
+  const scroller = document.querySelector('[data-testid="diff-scroller"]')
+  if (scroller === null) return null
+
+  const rowsOf = (): number => Number(scroller.getAttribute('aria-rowcount') ?? '0')
+
+  const control = scroller.querySelector<HTMLButtonElement>('button[aria-expanded="true"]')
+  if (control === null) return null
+
+  const blocks: number[] = []
+  const observer = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) blocks.push(entry.duration)
+  })
+  let observing = false
+  try {
+    observer.observe({ type: 'long-animation-frame', buffered: false })
+    observing = true
+  } catch {
+    // No such entry type here; the wall clock below still means something.
+  }
+
+  const blockingMeasurable = observing && (await proveObserverWorks(blocks))
+  blocks.length = 0
+
+  const rowsBefore = rowsOf()
+  const startedAt = performance.now()
+  control.click()
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      resolve()
+    })
+  })
+  const wallMs = performance.now() - startedAt
+
+  await sleep(200)
+  observer.disconnect()
+
+  return {
+    blockingMeasurable,
+    blockingMs: round(blocks.reduce((total, duration) => total + duration, 0)),
+    wallMs: round(wallMs),
+    rowsBefore,
+    rowsAfter: rowsOf(),
+  }
+}
+
+/**
  * Block the main thread on purpose and check the observer noticed. A zero from
  * a missing instrument looks like an answer, which is worse than no answer —
  * nothing is published here without first proving it can move.
  */
 async function proveObserverWorks(sink: number[]): Promise<boolean> {
   const before = sink.length
-  const until = performance.now() + 120
-  while (performance.now() < until) {
-    // Deliberately busy.
-  }
+  // Inside an animation frame on purpose. A long *animation frame* is only
+  // reported when a frame happens, so blocking an idle page proves nothing
+  // and reports nothing — which is how the fold measurement first came back
+  // with an unverified zero.
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      const until = performance.now() + 120
+      while (performance.now() < until) {
+        // Deliberately busy.
+      }
+      resolve()
+    })
+  })
   await sleep(150)
   return sink.length > before
 }
