@@ -281,3 +281,77 @@ describe('refusing work that is not worth it', () => {
 })
 
 const NEWLINE = String.fromCharCode(10)
+
+/**
+ * Work out what changed inside a line only for lines on screen. The saving on
+ * this corpus is 1.2 ms at worst; the point is that the hunk-at-a-time version
+ * scales with rows nobody has looked at.
+ */
+describe('intra-line work is done per line, not per hunk', () => {
+  const biggestHunkRow = (rows: RowIndex): { row: number; lines: number } => {
+    let best = { row: -1, lines: 0 }
+    for (let row = 0; row < rows.length; row += 1) {
+      const hunk = rows.hunkAt(row)
+      if (hunk !== null && hunk.lines.length > best.lines) best = { row, lines: hunk.lines.length }
+    }
+    return best
+  }
+
+  it('compares two lines, not two thousand, to draw one row', async () => {
+    const { rows } = load('linux-93e4b307-huge.diff')
+    const biggest = biggestHunkRow(rows)
+    expect(biggest.lines).toBeGreaterThan(500)
+
+    const store = new HighlightStore(
+      rows,
+      fakeHighlighter(() => '#FFF'),
+      ignore,
+    )
+    store.requestRange(biggest.row, biggest.row)
+    await settle()
+
+    // Nothing drawn yet: asking for the hunk must not compare anything.
+    expect(store.diffedLines).toBe(0)
+
+    // Draw ten rows of it.
+    for (let row = biggest.row; row < biggest.row + 10; row += 1) store.segmentsFor(row)
+
+    // At most both sides of each pair touched, nowhere near the hunk's size.
+    expect(store.diffedLines).toBeLessThanOrEqual(20)
+    expect(store.diffedLines).toBeLessThan(biggest.lines / 10)
+  })
+
+  it('remembers a line it has already compared', async () => {
+    const { rows } = load('vite-pr-23346-normal.diff')
+    const store = new HighlightStore(
+      rows,
+      fakeHighlighter(() => '#FFF'),
+      ignore,
+    )
+    store.requestRange(0, rows.length - 1)
+    await settle()
+
+    const row = firstLineRow(rows)
+    store.segmentsFor(row)
+    const after = store.diffedLines
+    for (let i = 0; i < 20; i += 1) store.segmentsFor(row)
+    expect(store.diffedLines).toBe(after)
+  })
+
+  it('still marks what changed once the row is drawn', async () => {
+    const { rows } = load('vite-pr-23346-normal.diff')
+    const store = new HighlightStore(
+      rows,
+      fakeHighlighter(() => '#FFF'),
+      ignore,
+    )
+    store.requestRange(0, rows.length - 1)
+    await settle()
+
+    let changed = 0
+    for (let row = 0; row < rows.length; row += 1) {
+      for (const segment of store.segmentsFor(row) ?? []) if (segment.changed) changed += 1
+    }
+    expect(changed).toBeGreaterThan(0)
+  })
+})
