@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { HighlightStore } from '../core/highlight/store'
-import { Folding, type HunkRef } from '../core/layout/folding'
+import { EXPAND_BY, Folding, type HunkRef } from '../core/layout/folding'
 import { MeasuredHeights } from '../core/layout/measuredHeights'
 import { RowIndex, RowKind, type LayoutMode } from '../core/layout/rowIndex'
 import { Virtualizer, type VisibleWindow } from '../core/layout/virtualizer'
 import type { ParsedDiff } from '../core/parse/types'
 import { HighlightClient } from '../workers/highlightClient'
 import { DiffRow, SplitDiffRow } from './DiffRow'
-import { FileHeaderRow, HunkHeaderRow, NoteRow } from './rows'
+import { ExpanderRow, FileHeaderRow, HunkHeaderRow, NoteRow } from './rows'
 
 /** Starting points only — every row that reaches the screen is measured. They
  *  keep the scrollbar roughly right on the first frame. */
@@ -52,13 +52,13 @@ export function VirtualDiff({
   const heights = useMemo(() => new MeasuredHeights(rows, ESTIMATED_HEIGHT), [rows])
 
   const [layout, setLayout] = useState<Layout>(() => ({
-    folding: Folding.all(rows),
+    folding: Folding.initial(rows),
     restore: null,
   }))
   const [openedFor, setOpenedFor] = useState(rows)
   let { folding } = layout
   if (openedFor !== rows) {
-    folding = Folding.all(rows)
+    folding = Folding.initial(rows)
     setOpenedFor(rows)
     setLayout({ folding, restore: null })
   }
@@ -157,6 +157,20 @@ export function VirtualDiff({
     [folding, refold],
   )
 
+  const expandHunk = useCallback(
+    (ref: HunkRef) => {
+      refold(folding.expandHunk(ref))
+    },
+    [folding, refold],
+  )
+
+  const expandHunkFully = useCallback(
+    (ref: HunkRef) => {
+      refold(folding.expandHunkFully(ref))
+    },
+    [folding, refold],
+  )
+
   /**
    * Measure what was rendered, then put the view back where it was.
    *
@@ -221,16 +235,41 @@ export function VirtualDiff({
   for (let position = shown.first; position <= shown.last; position += 1) {
     const row = folding.rowAt(position)
     if (row === -1) continue
-    visibleRows.push(
+
+    const drawn = (
       <Row
-        key={row}
         rows={rows}
         row={row}
         folding={folding}
         store={highlights.store}
         onToggleFile={toggleFile}
         onToggleHunk={toggleHunk}
-      />,
+      />
+    )
+
+    const hidden = folding.hiddenAfter(position)
+    if (hidden === 0) {
+      visibleRows.push(<Fragment key={row}>{drawn}</Fragment>)
+      continue
+    }
+
+    // The expander shares its position's element, so the height the
+    // virtualizer measures covers both and the arithmetic stays one row deep.
+    const ref = { file: rows.fileIndexAt(row), hunk: rows.hunkIndexAt(row) }
+    visibleRows.push(
+      <div key={row}>
+        {drawn}
+        <ExpanderRow
+          hidden={hidden}
+          chunk={EXPAND_BY}
+          onExpand={() => {
+            expandHunk(ref)
+          }}
+          onExpandAll={() => {
+            expandHunkFully(ref)
+          }}
+        />
+      </div>,
     )
   }
   void coloured

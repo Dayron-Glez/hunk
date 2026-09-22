@@ -63,7 +63,7 @@ describe('seeding a tree for the rows still visible', () => {
   it('hands back one height per visible row, in order', () => {
     const rows = load('vite-pr-23346-normal.diff')
     const heights = new MeasuredHeights(rows, ESTIMATES)
-    const folding = Folding.all(rows).toggleFile(0)
+    const folding = Folding.initial(rows).toggleFile(0)
 
     const seeded = heights.seed(folding)
     expect(seeded).toHaveLength(folding.length)
@@ -75,7 +75,7 @@ describe('seeding a tree for the rows still visible', () => {
   it('carries a measurement across a fold and back', () => {
     const rows = load('vite-pr-23346-normal.diff')
     const heights = new MeasuredHeights(rows, ESTIMATES)
-    const open = Folding.all(rows)
+    const open = Folding.initial(rows)
 
     // A wrapped line measures taller than the estimate for its kind.
     const row = open.rowAt(open.length - 1)
@@ -90,6 +90,6 @@ describe('seeding a tree for the rows still visible', () => {
 
   it('seeds nothing for a diff with no rows', () => {
     const rows = new RowIndex(parseUnifiedDiff(''))
-    expect(new MeasuredHeights(rows, ESTIMATES).seed(Folding.all(rows))).toHaveLength(0)
+    expect(new MeasuredHeights(rows, ESTIMATES).seed(Folding.initial(rows))).toHaveLength(0)
   })
 })

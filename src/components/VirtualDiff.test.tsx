@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readFixture } from '../../tests/fixtures'
+import { EXPAND_BY, LARGE_HUNK } from '../core/layout/folding'
 import { RowIndex } from '../core/layout/rowIndex'
 import { parseUnifiedDiff } from '../core/parse/unified'
 import { VirtualDiff } from './VirtualDiff'
@@ -287,3 +288,85 @@ describe('folding keeps the reader where they were', () => {
     expect(list().childElementCount).toBeGreaterThan(0)
   })
 })
+
+/**
+ * A large hunk opens in chunks. The lines come from the diff itself — the
+ * GitHub-style "expand the unchanged context" needs the original file, which
+ * a .diff does not carry.
+ *
+ * Built here rather than taken from the corpus: the two fixtures with a hunk
+ * over the threshold are 5.818 and 64.807 rows, and laying either out in full
+ * under jsdom takes longer than the test is allowed. What the real ones hide
+ * is asserted against the model instead, in folding.test.ts.
+ */
+describe('expanding a hunk too large to show at once', () => {
+  const hunkOf = (lines: number) => {
+    const body = Array.from({ length: lines }, (_, i) => ` line ${i}`)
+    return parseUnifiedDiff(
+      [
+        'diff --git a/big.ts b/big.ts',
+        '--- a/big.ts',
+        '+++ b/big.ts',
+        `@@ -1,${lines} +1,${lines} @@`,
+        ...body,
+        '',
+      ].join(NEWLINE),
+    )
+  }
+
+  const expander = (): HTMLElement | undefined =>
+    screen.queryAllByRole('button', { name: /^Show \d+ more lines?$/ })[0]
+
+  beforeEach(() => {
+    globalThis.testViewportHeight = 100_000
+  })
+
+  it('shows the first chunk and offers the rest, counted', () => {
+    render(<VirtualDiff diff={hunkOf(LARGE_HUNK + 60)} />)
+
+    expect(expander()).toBeDefined()
+    expect(screen.getByText('60 lines not shown')).toBeInTheDocument()
+    // The file header, the hunk header, and the rows up to the threshold.
+    expect(list().childElementCount).toBe(LARGE_HUNK + 2)
+  })
+
+  it('shows them when asked, and stops offering', () => {
+    render(<VirtualDiff diff={hunkOf(LARGE_HUNK + 60)} />)
+    fireEvent.click(expander()!)
+
+    expect(list().childElementCount).toBe(LARGE_HUNK + 62)
+    expect(expander()).toBeUndefined()
+  })
+
+  it('opens a chunk at a time when more than a chunk is hidden', () => {
+    render(<VirtualDiff diff={hunkOf(LARGE_HUNK + EXPAND_BY * 2)} />)
+
+    expect(screen.getByRole('button', { name: `Show ${EXPAND_BY} more lines` })).toBeInTheDocument()
+    fireEvent.click(expander()!)
+
+    expect(list().childElementCount).toBe(LARGE_HUNK + EXPAND_BY + 2)
+    expect(expander()).toBeDefined()
+  })
+
+  it('offers the whole rest as well, for a reader who wants all of it', () => {
+    const hidden = EXPAND_BY * 3
+    render(<VirtualDiff diff={hunkOf(LARGE_HUNK + hidden)} />)
+
+    fireEvent.click(screen.getByRole('button', { name: `Show all ${hidden}` }))
+    expect(list().childElementCount).toBe(LARGE_HUNK + hidden + 2)
+    expect(expander()).toBeUndefined()
+  })
+
+  it('leaves a hunk under the threshold alone', () => {
+    render(<VirtualDiff diff={hunkOf(LARGE_HUNK - 1)} />)
+    expect(expander()).toBeUndefined()
+    expect(screen.queryByText(/not shown/)).not.toBeInTheDocument()
+  })
+
+  it('leaves the real fixtures of ordinary hunks alone', () => {
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+    expect(expander()).toBeUndefined()
+  })
+})
+
+const NEWLINE = String.fromCharCode(10)

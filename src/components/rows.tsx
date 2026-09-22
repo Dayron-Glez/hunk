@@ -98,3 +98,48 @@ function Chevron({
     </button>
   )
 }
+
+/**
+ * What sits under the last row of a hunk that is not being shown in full.
+ *
+ * Two controls rather than one: a reader working through a long hunk wants
+ * the next screenful, and a reader who has decided they need all of it should
+ * not have to click ten times to say so. The count is spelled out because
+ * "show more" without a number hides how much is being withheld.
+ */
+export function ExpanderRow({
+  hidden,
+  chunk,
+  onExpand,
+  onExpandAll,
+}: {
+  readonly hidden: number
+  readonly chunk: number
+  readonly onExpand: () => void
+  readonly onExpandAll: () => void
+}) {
+  const next = Math.min(chunk, hidden)
+  return (
+    <div className="flex w-max min-w-full items-center gap-3 border-y border-neutral-800 bg-neutral-900/60 px-3 py-1.5 text-xs">
+      <button
+        type="button"
+        onClick={onExpand}
+        className="rounded border border-neutral-700 px-2 py-0.5 text-neutral-300 hover:bg-neutral-700/50"
+      >
+        Show {next.toLocaleString('en-US')} more {next === 1 ? 'line' : 'lines'}
+      </button>
+      {hidden > next ? (
+        <button
+          type="button"
+          onClick={onExpandAll}
+          className="rounded px-2 py-0.5 text-neutral-500 hover:text-neutral-200"
+        >
+          Show all {hidden.toLocaleString('en-US')}
+        </button>
+      ) : null}
+      <span className="text-neutral-600">
+        {hidden.toLocaleString('en-US')} {hidden === 1 ? 'line' : 'lines'} not shown
+      </span>
+    </div>
+  )
+}
