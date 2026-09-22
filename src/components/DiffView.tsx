@@ -1,5 +1,5 @@
 import type { ParsedDiff } from '../core/parse/types'
-import { FileDiff } from './FileDiff'
+import { VirtualDiff } from './VirtualDiff'
 
 export function DiffView({ diff }: { readonly diff: ParsedDiff }) {
   if (diff.files.length === 0) {
@@ -7,8 +7,8 @@ export function DiffView({ diff }: { readonly diff: ParsedDiff }) {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <div className="flex items-baseline gap-3 font-mono text-xs text-neutral-400">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-baseline gap-3 px-4 py-2 font-mono text-xs text-neutral-400">
         <span>
           {diff.files.length} {diff.files.length === 1 ? 'file' : 'files'}
         </span>
@@ -17,7 +17,7 @@ export function DiffView({ diff }: { readonly diff: ParsedDiff }) {
       </div>
 
       {diff.warnings.length > 0 ? (
-        <ul className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200/80">
+        <ul className="mx-4 mb-2 shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200/80">
           {diff.warnings.map((warning, index) => (
             <li key={index}>
               line {warning.line}: {warning.message}
@@ -26,9 +26,9 @@ export function DiffView({ diff }: { readonly diff: ParsedDiff }) {
         </ul>
       ) : null}
 
-      {diff.files.map((file, index) => (
-        <FileDiff key={`${file.oldPath ?? ''}:${file.newPath ?? ''}:${index}`} file={file} />
-      ))}
+      <div className="min-h-0 flex-1 border-t border-neutral-800">
+        <VirtualDiff diff={diff} />
+      </div>
     </div>
   )
 }

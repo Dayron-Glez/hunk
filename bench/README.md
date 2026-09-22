@@ -31,6 +31,25 @@ being measured.
 last run only — they need a live page, and repeating a three-second scroll three times triples
 the wall clock for a number that barely moves.
 
+**`render` means "the reader can see the diff", not "every row exists".** Before
+virtualization those were the same thing. They are not any more, and that is the entire point
+of the change rather than a softening of the measurement: what a reader waits for is the first
+screenful, and rows they have not scrolled to were never part of that wait.
+
+### One thing the harness got wrong for a while
+
+Tailwind decides which classes to emit by scanning source files, and it infers where to look
+from the build root. The benchmark builds from `bench/harness`, so it scanned that directory,
+found almost none of the classes the components use, and produced a stylesheet without them.
+The harness rendered **unstyled**, and nobody noticed, because an unstyled diff still looks
+like a list of lines.
+
+It mattered more than it sounds. Without a height on the scroll container the viewport was as
+tall as the whole document, so the virtualizer dutifully rendered every row and the
+measurement showed virtualization making things six times _worse_. `src/index.css` now names
+its source directory outright instead of letting the tool guess, and the F0 baseline was
+re-measured with styles before anything was compared against it.
+
 ## What it deliberately does not measure
 
 - **Fetching the diff.** The clock starts once the source is in hand. Network latency is not
@@ -90,9 +109,10 @@ A run writes `results/latest.json`, which is not committed — it is overwritten
 would only produce noisy diffs. Snapshots worth keeping are copied beside it under a name that
 says what they are, and those _are_ committed:
 
-| Snapshot               | What it records                                                             |
-| ---------------------- | --------------------------------------------------------------------------- |
-| `f0-naive-render.json` | Every line in the DOM, nothing virtualized. The measurement F1 has to beat. |
+| Snapshot               | What it records                                                                |
+| ---------------------- | ------------------------------------------------------------------------------ |
+| `f0-naive-render.json` | Every line in the DOM, nothing virtualized. The measurement F1 had to beat.    |
+| `f1-virtualized.json`  | Only the visible rows in the DOM, heights measured and corrected as they land. |
 
 Copy `latest.json` to a new name whenever a run is worth keeping. Without that, the first run
 after a change destroys the number the change was supposed to be compared against.

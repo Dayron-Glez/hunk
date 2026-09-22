@@ -1,5 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readFixture } from '../../tests/fixtures'
 import { parseUnifiedDiff } from '../core/parse/unified'
 import { DiffView } from './DiffView'
@@ -7,6 +7,16 @@ import { DiffView } from './DiffView'
 const renderFixture = (set: 'edge' | 'github', name: string): void => {
   render(<DiffView diff={parseUnifiedDiff(readFixture(set, name))} />)
 }
+
+// The tests below are about what the viewer says, not about what it leaves out,
+// so they are given a viewport tall enough to hold the whole fixture. The
+// windowing itself is exercised separately, with a small one.
+beforeEach(() => {
+  globalThis.testViewportHeight = 100_000
+})
+afterEach(() => {
+  globalThis.testViewportHeight = 800
+})
 
 describe('DiffView', () => {
   it('heads each file with its path and its line counts', () => {
