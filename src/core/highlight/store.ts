@@ -1,5 +1,9 @@
+import { pairChangedLines } from '../diff/pairLines'
+import { wordDiff, type Range } from '../diff/wordDiff'
 import type { RowIndex } from '../layout/rowIndex'
+import type { DiffLine } from '../parse/types'
 import { languageOf } from './language'
+import { mergeSegments, type Segment } from './segments'
 import { reconstructSides, sideForLine, type HunkSides } from './sides'
 import { spansOf, type FlatTokens, type Span } from './tokens'
 
@@ -38,6 +42,8 @@ interface Entry {
   /** Hunk line index to document line index, one array per side. */
   readonly oldLines: Uint32Array
   readonly newLines: Uint32Array
+  /** Hunk line index to the parts of it that changed. */
+  readonly ranges: Map<number, readonly Range[]>
   oldTokens: FlatTokens | null
   newTokens: FlatTokens | null
   done: boolean
@@ -102,6 +108,28 @@ export class HighlightStore {
     return spansOf(tokens, documentLine)
   }
 
+  /**
+   * Everything needed to draw one row: its colours and the parts of it that
+   * changed, cut so each piece has one of each. Null means plain text.
+   */
+  segmentsFor(row: number): Segment[] | null {
+    const key = this.keyOf(row)
+    if (key === -1) return null
+
+    const entry = this.entries.get(key)
+    if (entry == null) return null
+
+    const line = this.rows.lineAt(row)
+    const lineIndex = this.rows.lineIndexAt(row)
+    if (line === null || lineIndex === -1) return null
+
+    const spans = this.spansFor(row)
+    const ranges = entry.ranges.get(lineIndex) ?? []
+    if (spans === null && ranges.length === 0) return null
+
+    return mergeSegments(line.content.length, spans, ranges)
+  }
+
   /** Hunks asked for so far, for tests and for the benchmark to report. */
   get requested(): number {
     return this.entries.size
@@ -118,8 +146,7 @@ export class HighlightStore {
   private start(key: number, row: number): void {
     const file = this.rows.fileAt(row)
     const hunk = this.rows.hunkAt(row)
-    const lang = languageOf(file.newPath ?? file.oldPath)
-    if (hunk === null || lang === null) {
+    if (hunk === null) {
       this.entries.set(key, null)
       return
     }
@@ -129,11 +156,20 @@ export class HighlightStore {
       sides,
       oldLines: reverse(sides.old?.lines, hunk.lines.length),
       newLines: reverse(sides.new?.lines, hunk.lines.length),
+      ranges: intralineChanges(hunk.lines),
       oldTokens: null,
       newTokens: null,
       done: false,
     }
     this.entries.set(key, entry)
+
+    // Colour is optional; what changed inside a line is not, so it is found
+    // here whether or not a grammar exists for this file.
+    const lang = languageOf(file.newPath ?? file.oldPath)
+    if (lang === null) {
+      entry.done = true
+      return
+    }
 
     const ask = (document: { text: string } | null): Promise<FlatTokens | null> =>
       document === null || !worthHighlighting(document.text)
@@ -159,4 +195,20 @@ function reverse(lines: Uint32Array | undefined, hunkLineCount: number): Uint32A
     if (hunkLine !== undefined) out[hunkLine] = documentLine
   }
   return out
+}
+
+function intralineChanges(lines: readonly DiffLine[]): Map<number, readonly Range[]> {
+  const ranges = new Map<number, readonly Range[]>()
+  const pairs = pairChangedLines(lines)
+
+  for (const [from, to] of pairs) {
+    if (lines[from]?.kind !== 'delete') continue
+    const before = lines[from]?.content ?? ''
+    const after = lines[to]?.content ?? ''
+    const changes = wordDiff(before, after)
+    if (changes.before.length > 0) ranges.set(from, changes.before)
+    if (changes.after.length > 0) ranges.set(to, changes.after)
+  }
+
+  return ranges
 }

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import type { Span } from '../core/highlight/tokens'
+import type { Segment } from '../core/highlight/segments'
 import type { DiffLine } from '../core/parse/types'
 
 const ROW_STYLES: Record<DiffLine['kind'], string> = {
@@ -20,12 +20,18 @@ const MARKER_STYLES: Record<DiffLine['kind'], string> = {
   delete: 'text-rose-400',
 }
 
+const CHANGED_STYLES: Record<DiffLine['kind'], string> = {
+  context: '',
+  insert: 'bg-emerald-400/25 rounded-[2px]',
+  delete: 'bg-rose-400/25 rounded-[2px]',
+}
+
 export function DiffRow({
   line,
-  spans,
+  segments,
 }: {
   readonly line: DiffLine
-  readonly spans: readonly Span[] | null
+  readonly segments: readonly Segment[] | null
 }) {
   return (
     <div className={`flex min-h-5 w-max min-w-full leading-5 ${ROW_STYLES[line.kind]}`}>
@@ -46,11 +52,15 @@ export function DiffRow({
         </span>
       </div>
       <span className="whitespace-pre text-neutral-200">
-        {spans === null
+        {segments === null
           ? line.content
-          : spans.map((span, index) => (
-              <span key={index} style={styleOf(span)}>
-                {line.content.slice(span.start, span.end)}
+          : segments.map((segment, index) => (
+              <span
+                key={index}
+                className={segment.changed ? CHANGED_STYLES[line.kind] : undefined}
+                style={styleOf(segment)}
+              >
+                {line.content.slice(segment.start, segment.end)}
               </span>
             ))}
       </span>
@@ -61,10 +71,11 @@ export function DiffRow({
   )
 }
 
-function styleOf(span: Span): CSSProperties {
-  const style: CSSProperties = { color: span.color }
-  if (span.italic) style.fontStyle = 'italic'
-  if (span.bold) style.fontWeight = 'bold'
-  if (span.underline) style.textDecoration = 'underline'
+function styleOf(segment: Segment): CSSProperties {
+  const style: CSSProperties = {}
+  if (segment.color !== null) style.color = segment.color
+  if (segment.italic) style.fontStyle = 'italic'
+  if (segment.bold) style.fontWeight = 'bold'
+  if (segment.underline) style.textDecoration = 'underline'
   return style
 }

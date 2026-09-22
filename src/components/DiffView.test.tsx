@@ -4,9 +4,8 @@ import { readFixture } from '../../tests/fixtures'
 import { parseUnifiedDiff } from '../core/parse/unified'
 import { DiffView } from './DiffView'
 
-const renderFixture = (set: 'edge' | 'github', name: string): void => {
+const renderFixture = (set: 'edge' | 'github', name: string) =>
   render(<DiffView diff={parseUnifiedDiff(readFixture(set, name))} />)
-}
 
 // The tests below are about what the viewer says, not about what it leaves out,
 // so they are given a viewport tall enough to hold the whole fixture. The
@@ -64,8 +63,10 @@ describe('DiffView', () => {
   })
 
   it('names a submodule change rather than showing an empty file', () => {
-    renderFixture('github', 'git-4125f782-submodule-bump.diff')
-    expect(screen.getByText(/Subproject commit 855827c583bc30/)).toBeInTheDocument()
+    const { container } = renderFixture('github', 'git-4125f782-submodule-bump.diff')
+    // Read the rendered text rather than one node: intra-line highlighting
+    // splits a line wherever part of it changed, which is the point of it.
+    expect(container.textContent).toContain('Subproject commit 855827c583bc30')
   })
 
   it('flags the no-newline marker on the line it belongs to', () => {
