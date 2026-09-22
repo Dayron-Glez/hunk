@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-09-22T16:33:35.011Z",
+  "recordedAt": "2026-09-22T16:41:03.500Z",
   "machine": {
     "platform": "win32",
     "arch": "x64",
@@ -9,18 +9,45 @@
   "repeats": 3,
   "results": [
     {
-      "name": "synthetic-100k",
-      "label": "100k lines",
-      "bytes": 4297571,
-      "files": 407,
-      "lines": 100000,
-      "parseMs": 18.6,
-      "renderMs": 29.6,
-      "totalMs": 47.8,
+      "name": "synthetic-1k",
+      "label": "1k lines",
+      "bytes": 42367,
+      "files": 6,
+      "lines": 1000,
+      "parseMs": 1.3,
+      "renderMs": 32.4,
+      "totalMs": 33.8,
       "runs": [
-        49.3,
-        46.8,
-        47.8
+        44.3,
+        33.8,
+        26.9
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.6,
+        "lagWorstMs": 10.1,
+        "durationMs": 1886.7,
+        "documentHeightPx": 20798
+      },
+      "memoryMB": 3,
+      "domNodes": 2140
+    },
+    {
+      "name": "synthetic-10k",
+      "label": "10k lines",
+      "bytes": 430995,
+      "files": 43,
+      "lines": 10000,
+      "parseMs": 3.2,
+      "renderMs": 29.9,
+      "totalMs": 33,
+      "runs": [
+        34.5,
+        32.7,
+        33
       ],
       "scroll": {
         "blockingMeasurable": true,
@@ -28,8 +55,62 @@
         "worstBlockMs": 0,
         "longFrames": 0,
         "lagMedianMs": 4.8,
-        "lagWorstMs": 12.4,
-        "durationMs": 1873.5,
+        "lagWorstMs": 11,
+        "durationMs": 1877.7,
+        "documentHeightPx": 206511
+      },
+      "memoryMB": 4,
+      "domNodes": 2343
+    },
+    {
+      "name": "synthetic-50k",
+      "label": "50k lines",
+      "bytes": 2149536,
+      "files": 205,
+      "lines": 50000,
+      "parseMs": 10.1,
+      "renderMs": 31.5,
+      "totalMs": 41.2,
+      "runs": [
+        45.9,
+        38.8,
+        41.2
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.8,
+        "lagWorstMs": 10.5,
+        "durationMs": 1866.3,
+        "documentHeightPx": 1031801
+      },
+      "memoryMB": 7,
+      "domNodes": 2075
+    },
+    {
+      "name": "synthetic-100k",
+      "label": "100k lines",
+      "bytes": 4297571,
+      "files": 407,
+      "lines": 100000,
+      "parseMs": 17.2,
+      "renderMs": 30.8,
+      "totalMs": 48,
+      "runs": [
+        48.1,
+        48,
+        45.5
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.8,
+        "lagWorstMs": 13,
+        "durationMs": 1880.8,
         "documentHeightPx": 2063659
       },
       "memoryMB": 9,
@@ -41,13 +122,13 @@
       "bytes": 3835384,
       "files": 397,
       "lines": 100000,
-      "parseMs": 18.5,
-      "renderMs": 29.6,
-      "totalMs": 48.1,
+      "parseMs": 18.6,
+      "renderMs": 30.3,
+      "totalMs": 48.3,
       "runs": [
-        50.1,
-        48.1,
-        44.7
+        46.9,
+        48.3,
+        55.4
       ],
       "scroll": {
         "blockingMeasurable": true,
@@ -55,8 +136,8 @@
         "worstBlockMs": 0,
         "longFrames": 0,
         "lagMedianMs": 4.8,
-        "lagWorstMs": 11.6,
-        "durationMs": 1875.4,
+        "lagWorstMs": 10.4,
+        "durationMs": 1877.8,
         "documentHeightPx": 2062641
       },
       "memoryMB": 9,
@@ -68,26 +149,80 @@
       "bytes": 2121675,
       "files": 758,
       "lines": 62165,
-      "parseMs": 13,
-      "renderMs": 30,
-      "totalMs": 43,
+      "parseMs": 15,
+      "renderMs": 32.2,
+      "totalMs": 47.6,
       "runs": [
-        45.7,
-        43,
-        42.2
+        45,
+        48.9,
+        47.6
       ],
       "scroll": {
         "blockingMeasurable": true,
         "blockingMs": 0,
         "worstBlockMs": 0,
         "longFrames": 0,
-        "lagMedianMs": 4.9,
-        "lagWorstMs": 11,
-        "durationMs": 1892.7,
+        "lagMedianMs": 4.7,
+        "lagWorstMs": 18.3,
+        "durationMs": 1888.8,
         "documentHeightPx": 1316702
       },
       "memoryMB": 7,
       "domNodes": 1562
+    },
+    {
+      "name": "real-minified",
+      "label": "Minified bundles — 371 KB in 128 lines",
+      "bytes": 379969,
+      "files": 9,
+      "lines": 128,
+      "parseMs": 0.8,
+      "renderMs": 55.6,
+      "totalMs": 56.4,
+      "runs": [
+        59.9,
+        55.7,
+        56.4
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.5,
+        "lagWorstMs": 7.3,
+        "durationMs": 1880.8,
+        "documentHeightPx": 3133
+      },
+      "memoryMB": 3,
+      "domNodes": 1325
+    },
+    {
+      "name": "real-mass-rename",
+      "label": "168 files, mostly renames",
+      "bytes": 461816,
+      "files": 168,
+      "lines": 5385,
+      "parseMs": 2.4,
+      "renderMs": 26.8,
+      "totalMs": 29.2,
+      "runs": [
+        29.2,
+        28.9,
+        31.5
+      ],
+      "scroll": {
+        "blockingMeasurable": true,
+        "blockingMs": 0,
+        "worstBlockMs": 0,
+        "longFrames": 0,
+        "lagMedianMs": 4.7,
+        "lagWorstMs": 14.3,
+        "durationMs": 1876.3,
+        "documentHeightPx": 123944
+      },
+      "memoryMB": 4,
+      "domNodes": 1744
     }
   ]
 }
