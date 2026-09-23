@@ -7,6 +7,7 @@ import {
   type PullRequestRef,
 } from '../core/source/github'
 import { FileDiff, GitPullRequest, Loader2 } from 'lucide-react'
+import { cn } from '../lib/utils'
 import { Explain } from './Explain'
 import { describeFailure } from './loadFailure'
 import { Button } from './ui/button'
@@ -138,14 +139,30 @@ export function SourcePicker({
               className="min-w-0 flex-1 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-1.5 font-mono text-xs text-neutral-200 outline-none placeholder:text-neutral-400 focus:border-sky-500"
             />
             <Button type="submit" variant="primary" disabled={url.trim() === '' || fetching}>
-              {fetching ? (
-                <>
-                  <Loader2 aria-hidden className="size-4 animate-spin" />
+              {/* Both labels share one grid cell, so the button is always as
+                  wide as the longer of them. Swapping the text instead made
+                  the button grow and the field beside it shrink mid-request,
+                  which moved the text the reader had just typed. */}
+              <span className="grid place-items-center">
+                <span
+                  className={cn('col-start-1 row-start-1', fetching && 'invisible')}
+                  aria-hidden={fetching}
+                >
+                  Read it
+                </span>
+                <span
+                  className={cn(
+                    'col-start-1 row-start-1 flex items-center gap-1.5',
+                    !fetching && 'invisible',
+                  )}
+                  aria-hidden={!fetching}
+                >
+                  {/* Only where motion is welcome. The word carries the state
+                      on its own, so a still icon loses nothing. */}
+                  <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" />
                   Reading…
-                </>
-              ) : (
-                'Read it'
-              )}
+                </span>
+              </span>
             </Button>
           </div>
           {failure === null ? (

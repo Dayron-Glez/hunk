@@ -169,3 +169,63 @@ describe('the other ways in still work', () => {
     expect(screen.getByRole('button', { name: /Linux kernel commit/ })).toBeInTheDocument()
   })
 })
+
+/**
+ * Swapping "Read it" for "Reading…" made the button wider, and the field
+ * beside it narrower, in the middle of a request — moving the text the reader
+ * had just typed. Both labels now share a grid cell, so the button is always
+ * as wide as the longer one.
+ */
+describe('the button keeps its size while it works', () => {
+  const submit = (): HTMLElement => screen.getByRole('button', { name: /^(Read it|Reading…)$/ })
+
+  const labels = (): { text: string; hidden: string | null }[] =>
+    Array.from(submit().querySelectorAll('span > span')).map((el) => ({
+      text: (el.textContent ?? '').trim(),
+      hidden: el.getAttribute('aria-hidden'),
+    }))
+
+  it('carries both labels, with only one of them alive', () => {
+    const held = heldFetch()
+    vi.stubGlobal('fetch', held.fetch)
+    render(<SourcePicker onLoad={vi.fn()} />)
+
+    expect(labels()).toEqual([
+      { text: 'Read it', hidden: 'false' },
+      { text: 'Reading…', hidden: 'true' },
+    ])
+
+    type('vitejs/vite#23346')
+    fireEvent.click(submit())
+
+    expect(labels()).toEqual([
+      { text: 'Read it', hidden: 'true' },
+      { text: 'Reading…', hidden: 'false' },
+    ])
+  })
+
+  it('reads as one label at a time, not both at once', () => {
+    const held = heldFetch()
+    vi.stubGlobal('fetch', held.fetch)
+    render(<SourcePicker onLoad={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: 'Read it' })).toBeInTheDocument()
+    type('vitejs/vite#23346')
+    fireEvent.click(submit())
+    expect(screen.getByRole('button', { name: 'Reading…' })).toBeInTheDocument()
+  })
+
+  /** The README says what moves in this application; a spinner that ignored
+   *  the request for less of it would make that untrue. */
+  it('only spins where motion is welcome', () => {
+    const held = heldFetch()
+    vi.stubGlobal('fetch', held.fetch)
+    render(<SourcePicker onLoad={vi.fn()} />)
+
+    type('vitejs/vite#23346')
+    fireEvent.click(submit())
+
+    const spinner = submit().querySelector('svg')!
+    expect(spinner.getAttribute('class')).toContain('motion-safe:animate-spin')
+  })
+})

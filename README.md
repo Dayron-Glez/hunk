@@ -113,9 +113,10 @@ size: 484 elements in one column, 740 in two, and nothing under 4.5:1. That audi
 the line numbers at **2.53:1** — `neutral-500` would not have fixed it either, at 3.54:1
 against a removed line.
 
-Nothing moves. There is one colour transition in the application and no animation, translation
-or smooth scrolling anywhere, so there is nothing for `prefers-reduced-motion` to turn off. A
-media query that switched nothing off would be decoration.
+Almost nothing moves. One colour transition on the drop zone, and one spinner while a pull
+request is being fetched — that one is behind `motion-safe`, so a reader who asks for less
+motion gets a still icon and the word "Reading…", which carried the state anyway. There is no
+translation, parallax or smooth scrolling to turn off.
 
 ## Run the benchmark yourself
 
