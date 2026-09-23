@@ -6,7 +6,11 @@ import {
   type LoadFailure,
   type PullRequestRef,
 } from '../core/source/github'
+import { FileDiff, GitPullRequest, Loader2 } from 'lucide-react'
+import { Explain } from './Explain'
 import { describeFailure } from './loadFailure'
+import { Button } from './ui/button'
+import { TooltipProvider } from './ui/tooltip'
 
 const samples = import.meta.glob<string>('../../fixtures/github/*.diff', {
   query: '?raw',
@@ -102,118 +106,135 @@ export function SourcePicker({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6">
-      <div>
-        <h1 className="font-mono text-2xl font-semibold text-neutral-100">hunk</h1>
-        <p className="text-sm text-neutral-400">a high-performance diff viewer</p>
-      </div>
+    <TooltipProvider>
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6">
+        <div className="flex items-center gap-3">
+          <FileDiff aria-hidden className="size-7 text-sky-500" />
+          <div>
+            <h1 className="font-mono text-2xl font-semibold text-neutral-100">hunk</h1>
+            <p className="text-sm text-neutral-400">a high-performance diff viewer</p>
+          </div>
+        </div>
 
-      <form onSubmit={openPullRequest} className="flex flex-col gap-2">
-        <label htmlFor="pr-url" className="text-sm text-neutral-400">
-          Paste a pull request link
-        </label>
-        <div className="flex gap-2">
-          <input
-            id="pr-url"
-            type="text"
-            inputMode="url"
-            spellCheck={false}
-            value={url}
+        <form onSubmit={openPullRequest} className="flex flex-col gap-2">
+          <label htmlFor="pr-url" className="flex items-center gap-2 text-sm text-neutral-400">
+            <GitPullRequest aria-hidden className="size-4" />
+            Paste a pull request link
+          </label>
+          <div className="flex gap-2">
+            <input
+              id="pr-url"
+              type="text"
+              inputMode="url"
+              spellCheck={false}
+              value={url}
+              onChange={(event) => {
+                setUrl(event.target.value)
+                setFailure(null)
+              }}
+              placeholder="github.com/owner/repo/pull/123"
+              aria-describedby={failure === null ? 'pr-limit' : 'pr-failure'}
+              aria-invalid={failure !== null}
+              className="min-w-0 flex-1 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-1.5 font-mono text-xs text-neutral-200 outline-none placeholder:text-neutral-400 focus:border-sky-500"
+            />
+            <Button type="submit" variant="primary" disabled={url.trim() === '' || fetching}>
+              {fetching ? (
+                <>
+                  <Loader2 aria-hidden className="size-4 animate-spin" />
+                  Reading…
+                </>
+              ) : (
+                'Read it'
+              )}
+            </Button>
+          </div>
+          {failure === null ? (
+            <Explain
+              side="bottom"
+              text="hunk asks GitHub for the diff from your browser. Without an account GitHub allows sixty of those an hour, and it will not hand over anything from a private repository. Dropping a .diff file needs neither."
+            >
+              <p
+                id="pr-limit"
+                className="w-fit cursor-help text-xs text-neutral-400 underline decoration-dotted underline-offset-4"
+              >
+                Public repositories only, through GitHub&rsquo;s API — sixty requests an hour
+                without an account.
+              </p>
+            </Explain>
+          ) : (
+            <p id="pr-failure" role="alert" className="text-xs text-amber-200/90">
+              {describeFailure(failure)}
+            </p>
+          )}
+        </form>
+
+        <div
+          onDragOver={(event) => {
+            event.preventDefault()
+            setDragging(true)
+          }}
+          onDragLeave={() => {
+            setDragging(false)
+          }}
+          onDrop={handleDrop}
+          className={`rounded-lg border border-dashed p-8 text-center text-sm transition-colors ${
+            dragging
+              ? 'border-sky-400 bg-sky-500/10 text-sky-200'
+              : 'border-neutral-700 text-neutral-400'
+          }`}
+        >
+          Drop a <code className="font-mono">.diff</code> or{' '}
+          <code className="font-mono">.patch</code> here
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label htmlFor="paste" className="text-sm text-neutral-400">
+            …or paste a diff
+          </label>
+          <textarea
+            id="paste"
+            value={pasted}
             onChange={(event) => {
-              setUrl(event.target.value)
-              setFailure(null)
+              setPasted(event.target.value)
             }}
-            placeholder="github.com/owner/repo/pull/123"
-            aria-describedby={failure === null ? 'pr-limit' : 'pr-failure'}
-            aria-invalid={failure !== null}
-            className="min-w-0 flex-1 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-1.5 font-mono text-xs text-neutral-200 outline-none placeholder:text-neutral-400 focus:border-sky-500"
+            rows={6}
+            spellCheck={false}
+            className="w-full resize-y rounded-lg border border-neutral-800 bg-neutral-900 p-3 font-mono text-xs text-neutral-200 outline-none placeholder:text-neutral-400 focus:border-sky-500"
+            placeholder="diff --git a/… b/…"
           />
           <button
-            type="submit"
-            disabled={url.trim() === '' || fetching}
-            className="shrink-0 rounded-md bg-sky-700 px-3 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
+            type="button"
+            disabled={pasted.trim() === ''}
+            onClick={() => {
+              onLoad(pasted, null)
+            }}
+            className="self-start rounded-md bg-sky-700 px-3 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {fetching ? 'Reading…' : 'Read it'}
+            Render it
           </button>
         </div>
-        {failure === null ? (
-          <p id="pr-limit" className="text-xs text-neutral-400">
-            Public repositories only, through GitHub&rsquo;s API — sixty requests an hour without an
-            account.
-          </p>
-        ) : (
-          <p id="pr-failure" role="alert" className="text-xs text-amber-200/90">
-            {describeFailure(failure)}
-          </p>
-        )}
-      </form>
 
-      <div
-        onDragOver={(event) => {
-          event.preventDefault()
-          setDragging(true)
-        }}
-        onDragLeave={() => {
-          setDragging(false)
-        }}
-        onDrop={handleDrop}
-        className={`rounded-lg border border-dashed p-8 text-center text-sm transition-colors ${
-          dragging
-            ? 'border-sky-400 bg-sky-500/10 text-sky-200'
-            : 'border-neutral-700 text-neutral-400'
-        }`}
-      >
-        Drop a <code className="font-mono">.diff</code> or <code className="font-mono">.patch</code>{' '}
-        here
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-neutral-400">…or try one of the real ones</p>
+          <ul className="flex flex-col gap-1">
+            {SAMPLE_ORDER.map((name) => (
+              <li key={name}>
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => {
+                    loadSample(name)
+                  }}
+                  className="w-full rounded-md border border-neutral-800 px-3 py-2 text-left text-sm text-neutral-300 hover:border-neutral-600 hover:bg-neutral-900 disabled:opacity-40"
+                >
+                  {SAMPLE_LABELS[name]}
+                  {busy === name ? <span className="text-neutral-400"> — loading…</span> : null}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
-
-      <div className="flex flex-col gap-2">
-        <label htmlFor="paste" className="text-sm text-neutral-400">
-          …or paste a diff
-        </label>
-        <textarea
-          id="paste"
-          value={pasted}
-          onChange={(event) => {
-            setPasted(event.target.value)
-          }}
-          rows={6}
-          spellCheck={false}
-          className="w-full resize-y rounded-lg border border-neutral-800 bg-neutral-900 p-3 font-mono text-xs text-neutral-200 outline-none placeholder:text-neutral-400 focus:border-sky-500"
-          placeholder="diff --git a/… b/…"
-        />
-        <button
-          type="button"
-          disabled={pasted.trim() === ''}
-          onClick={() => {
-            onLoad(pasted, null)
-          }}
-          className="self-start rounded-md bg-sky-700 px-3 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Render it
-        </button>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <p className="text-sm text-neutral-400">…or try one of the real ones</p>
-        <ul className="flex flex-col gap-1">
-          {SAMPLE_ORDER.map((name) => (
-            <li key={name}>
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => {
-                  loadSample(name)
-                }}
-                className="w-full rounded-md border border-neutral-800 px-3 py-2 text-left text-sm text-neutral-300 hover:border-neutral-600 hover:bg-neutral-900 disabled:opacity-40"
-              >
-                {SAMPLE_LABELS[name]}
-                {busy === name ? <span className="text-neutral-400"> — loading…</span> : null}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
+    </TooltipProvider>
   )
 }

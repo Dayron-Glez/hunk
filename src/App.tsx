@@ -1,6 +1,8 @@
+import { ArrowLeft, FileDiff } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { DiffView } from './components/DiffView'
 import { SourcePicker } from './components/SourcePicker'
+import { Button } from './components/ui/button'
 import { useExpansion } from './components/useExpansion'
 import type { DiffOrigin } from './core/expand/blobs'
 import type { PullRequestRef } from './core/source/github'
@@ -83,17 +85,13 @@ export function App() {
 
   return (
     <main className="flex h-full flex-col bg-neutral-950 text-neutral-100">
-      <div className="flex shrink-0 items-center gap-3 border-b border-neutral-800 px-4 py-2">
+      <div className="flex shrink-0 items-center gap-2 border-b border-neutral-800 px-4 py-2">
+        <FileDiff aria-hidden className="size-4 text-sky-500" />
         <h1 className="font-mono text-sm font-semibold">hunk</h1>
-        <button
-          type="button"
-          onClick={() => {
-            history.back()
-          }}
-          className="ml-auto rounded-md border border-neutral-800 px-2 py-1 text-xs text-neutral-400 hover:border-neutral-600 hover:text-neutral-200"
-        >
+        <Button size="sm" className="ml-auto" onClick={() => history.back()}>
+          <ArrowLeft aria-hidden className="size-3.5" />
           Load another
-        </button>
+        </Button>
       </div>
       <div className="min-h-0 flex-1">
         <DiffView diff={loaded.diff} expansion={expansion} />

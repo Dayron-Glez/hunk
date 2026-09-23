@@ -18,6 +18,7 @@ import { Virtualizer, type VisibleWindow } from '../core/layout/virtualizer'
 import type { ParsedDiff } from '../core/parse/types'
 import { HighlightClient } from '../workers/highlightClient'
 import { DiffRow, SplitDiffRow } from './DiffRow'
+import { RowHints } from './RowHints'
 import { ExpanderRow, FileHeaderRow, GapRow, HunkHeaderRow, NoteRow, type GapState } from './rows'
 
 /** Starting points only — every row that reaches the screen is measured. They
@@ -490,6 +491,8 @@ export function VirtualDiff({
           {visibleRows}
         </div>
       </div>
+      {/* One for all of them: see RowHints for why not one each. */}
+      <RowHints containerRef={scrollerRef} />
     </div>
   )
 }
