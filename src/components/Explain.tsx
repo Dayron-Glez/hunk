@@ -1,5 +1,12 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
+
+interface ExplainProps {
+  children: ReactNode
+  text: ReactNode
+  side?: 'top' | 'right' | 'bottom' | 'left'
+  width?: CSSProperties['width']
+}
 
 /**
  * A short explanation attached to something on screen.
@@ -12,19 +19,20 @@ import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip'
  * `asChild` so the trigger is the element itself rather than a wrapper around
  * it: an extra button around a button is two tab stops for one control.
  */
-export function Explain({
-  children,
-  text,
-  side = 'bottom',
-}: {
-  readonly children: ReactNode
-  readonly text: ReactNode
-  readonly side?: 'top' | 'right' | 'bottom' | 'left'
-}) {
+export function Explain({ children, text, side = 'bottom', width }: Readonly<ExplainProps>) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side={side}>{text}</TooltipContent>
+      <TooltipContent
+        side={side}
+        style={
+          width === undefined
+            ? undefined
+            : { width, maxWidth: 'var(--radix-tooltip-content-available-width)' }
+        }
+      >
+        {text}
+      </TooltipContent>
     </Tooltip>
   )
 }

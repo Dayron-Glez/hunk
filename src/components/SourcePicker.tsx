@@ -6,7 +6,7 @@ import {
   type LoadFailure,
   type PullRequestRef,
 } from '../core/source/github'
-import { FileDiff, GitPullRequest, Loader2 } from 'lucide-react'
+import { FileDiff, GitPullRequest, Loader2, Upload } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Explain } from './Explain'
 import { describeFailure } from './loadFailure'
@@ -86,14 +86,18 @@ export function SourcePicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on the ref it was given
   }, [openOnMount])
 
-  const handleDrop = (event: DragEvent<HTMLDivElement>): void => {
-    event.preventDefault()
-    setDragging(false)
-    const file = event.dataTransfer.files[0]
+  /** A dropped file and a chosen one are the same thing once it is in hand. */
+  const readFile = (file: File | undefined): void => {
     if (file === undefined) return
     void file.text().then((text) => {
       onLoad(text, null)
     })
+  }
+
+  const handleDrop = (event: DragEvent<HTMLLabelElement>): void => {
+    event.preventDefault()
+    setDragging(false)
+    readFile(event.dataTransfer.files[0])
   }
 
   const loadSample = (name: string): void => {
@@ -185,7 +189,15 @@ export function SourcePicker({
           )}
         </form>
 
-        <div
+        {/*
+          A label rather than a div: dropping a file was the only way in, and
+          a reader who would rather pick one — or who is on a keyboard, where
+          there is no dragging at all — had nothing to press. The input it
+          wraps is the control; `focus-within` is what shows the ring, since
+          the input itself is out of sight.
+        */}
+        <label
+          htmlFor="diff-file"
           onDragOver={(event) => {
             event.preventDefault()
             setDragging(true)
@@ -194,15 +206,33 @@ export function SourcePicker({
             setDragging(false)
           }}
           onDrop={handleDrop}
-          className={`rounded-lg border border-dashed p-8 text-center text-sm transition-colors ${
+          className={cn(
+            'flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-dashed p-8',
+            'text-center text-sm transition-colors focus-within:border-sky-400',
+            'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-sky-400',
             dragging
               ? 'border-sky-400 bg-sky-500/10 text-sky-200'
-              : 'border-neutral-700 text-neutral-400'
-          }`}
+              : 'border-neutral-700 text-neutral-400 hover:border-neutral-500 hover:text-neutral-300',
+          )}
         >
-          Drop a <code className="font-mono">.diff</code> or{' '}
-          <code className="font-mono">.patch</code> here
-        </div>
+          <input
+            id="diff-file"
+            type="file"
+            accept=".diff,.patch,text/plain"
+            className="sr-only"
+            onChange={(event) => {
+              readFile(event.target.files?.[0])
+              // Cleared, so choosing the same file twice in a row still fires.
+              event.target.value = ''
+            }}
+          />
+          <Upload aria-hidden className="size-5" />
+          <span>
+            Drop a <code className="font-mono">.diff</code> or{' '}
+            <code className="font-mono">.patch</code> here
+          </span>
+          <span className="text-xs text-neutral-400">or choose a file</span>
+        </label>
 
         <div className="flex flex-col gap-2">
           <label htmlFor="paste" className="text-sm text-neutral-400">

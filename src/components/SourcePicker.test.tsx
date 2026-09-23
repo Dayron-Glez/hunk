@@ -229,3 +229,78 @@ describe('the button keeps its size while it works', () => {
     expect(spinner.getAttribute('class')).toContain('motion-safe:animate-spin')
   })
 })
+
+/**
+ * Dropping was the only way in. A reader who would rather pick a file had
+ * nothing to press, and one on a keyboard had nothing at all — there is no
+ * dragging without a pointer.
+ */
+describe('choosing a file as well as dropping one', () => {
+  const field = (): HTMLInputElement => screen.getByLabelText(/Drop a .diff or .patch here/)
+
+  const fileOf = (text: string): File => new File([text], 'change.diff', { type: 'text/plain' })
+
+  it('offers a real file input, reachable by keyboard', () => {
+    render(<SourcePicker onLoad={vi.fn()} />)
+
+    const input = field()
+    expect(input.type).toBe('file')
+    // Out of sight, not out of the tab order: the label shows the ring.
+    expect(input.className).toContain('sr-only')
+    expect(input).not.toHaveAttribute('tabindex', '-1')
+  })
+
+  it('says a file can be chosen, not only dropped', () => {
+    render(<SourcePicker onLoad={vi.fn()} />)
+    expect(screen.getByText('or choose a file')).toBeInTheDocument()
+  })
+
+  it('reads the file that was chosen', async () => {
+    const onLoad = vi.fn()
+    render(<SourcePicker onLoad={onLoad} />)
+
+    fireEvent.change(field(), { target: { files: [fileOf('diff --git a/a b/a\n')] } })
+    await waitFor(() => {
+      expect(onLoad).toHaveBeenCalledWith('diff --git a/a b/a\n', null)
+    })
+  })
+
+  it('still reads one that was dropped', async () => {
+    const onLoad = vi.fn()
+    render(<SourcePicker onLoad={onLoad} />)
+
+    const zone = field().closest('label')!
+    fireEvent.drop(zone, { dataTransfer: { files: [fileOf('diff --git a/b b/b\n')] } })
+    await waitFor(() => {
+      expect(onLoad).toHaveBeenCalledWith('diff --git a/b b/b\n', null)
+    })
+  })
+
+  it('takes the same file twice in a row', async () => {
+    const onLoad = vi.fn()
+    render(<SourcePicker onLoad={onLoad} />)
+
+    // The input is cleared after each read, or the second choice of the same
+    // file fires no change event at all.
+    fireEvent.change(field(), { target: { files: [fileOf('one')] } })
+    await waitFor(() => {
+      expect(onLoad).toHaveBeenCalledOnce()
+    })
+    expect(field().value).toBe('')
+  })
+
+  it('asks the picker for the kinds it can read', () => {
+    render(<SourcePicker onLoad={vi.fn()} />)
+    expect(field().accept).toContain('.diff')
+    expect(field().accept).toContain('.patch')
+  })
+
+  /** The input is out of sight, so the ring has to be drawn by the label
+   *  around it or a keyboard reader has nothing to see. */
+  it('shows a focus ring on the zone, since the input itself is hidden', () => {
+    render(<SourcePicker onLoad={vi.fn()} />)
+    const zone = field().closest('label')!
+    expect(zone.className).toContain('focus-within:outline-2')
+    expect(zone.className).toContain('focus-within:outline-sky-400')
+  })
+})
