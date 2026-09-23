@@ -750,16 +750,42 @@ describe('the lines the diff left out', () => {
     expect(screen.getByText('591 unchanged lines')).toBeInTheDocument()
   })
 
+  /**
+   * A gap before the first hunk has nothing above it, so the only lines it can
+   * reveal are the ones touching the hunk below. Offering the other direction
+   * put line 1 of the file directly before line 4.428 on a real pull request.
+   */
+  it('offers only the arrow that points at a hunk', () => {
+    globalThis.testViewportHeight = 100_000
+    const spy = expansionSpy()
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} expansion={spy.value} />)
+
+    // Both files of that pull request start past line one and have one hunk.
+    expect(screen.getAllByRole('button', { name: '↑ 20' }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: '↓ 20' })).not.toBeInTheDocument()
+  })
+
+  it('offers both ends of a gap that has a hunk on each side', () => {
+    globalThis.testViewportHeight = 100_000
+    const spy = expansionSpy()
+    // Seven of that pull request's gaps sit between two hunks. The label
+    // carries the step, which is the gap's own size when it is under a chunk.
+    render(<VirtualDiff diff={diffOf('vite-pr-23378-new-files.diff')} expansion={spy.value} />)
+
+    fireEvent.click(screen.getAllByRole('button', { name: /^↓ / })[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: /^↑ / })[0]!)
+    expect(spy.calls.map((c) => c.direction)).toEqual(['down', 'up'])
+  })
+
   it('asks for the end the reader pressed', () => {
     globalThis.testViewportHeight = 100_000
     const spy = expansionSpy()
     render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} expansion={spy.value} />)
 
     fireEvent.click(screen.getAllByRole('button', { name: '↑ 20' })[0]!)
-    fireEvent.click(screen.getAllByRole('button', { name: '↓ 20' })[0]!)
     fireEvent.click(screen.getAllByRole('button', { name: /^All / })[0]!)
 
-    expect(spy.calls.map((c) => c.direction)).toEqual(['up', 'down', 'all'])
+    expect(spy.calls.map((c) => c.direction)).toEqual(['up', 'all'])
     expect(new Set(spy.calls.map((c) => c.from)).size).toBe(1)
   })
 

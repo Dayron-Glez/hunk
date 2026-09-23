@@ -145,7 +145,18 @@ export function expandGap(
   if (available === null || available <= 0) return file
 
   const take = direction === 'all' ? available : Math.min(chunk, available)
-  const fromTop = direction === 'down' || direction === 'all'
+
+  // Which end the lines come from is only the reader's choice when the gap has
+  // a hunk on both sides. A gap before the first hunk has nothing above it, so
+  // its lines can only be the ones just above that hunk — taking them from the
+  // top of the file instead put line 1 directly before line 4.428, under a
+  // header that claimed otherwise.
+  const fromTop =
+    gap.after === -1
+      ? false
+      : gap.before === -1
+        ? true
+        : direction === 'down' || direction === 'all'
 
   const newStart = fromTop ? gap.newFrom : gap.newFrom + available - take
   const offset = gap.oldFrom - gap.newFrom

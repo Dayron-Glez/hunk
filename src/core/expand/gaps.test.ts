@@ -393,3 +393,54 @@ describe('applying it to the whole diff', () => {
     expect(expandInDiff(diff, 7, gap, source(40), 'all', 20)).toBe(diff)
   })
 })
+
+/**
+ * A gap with a hunk on only one side has only one sensible end to open from:
+ * the one touching that hunk. Asking for the other put line 1 of the file
+ * directly before line 4.428, under a header that said 4.408 — visible on a
+ * real pull request as a hunk whose body restarted at 1.
+ */
+describe('a gap with only one neighbour', () => {
+  const leading = () => fileOf(hunk(30, 30, '  '))
+
+  it('opens the space before the first hunk from the bottom, whichever way it is asked', () => {
+    const file = leading()
+    const gap = gapsIn(file).find((g) => g.after === -1)!
+
+    for (const direction of ['up', 'down'] as const) {
+      const after = expandGap(file, gap, source(60), direction, 5)
+      expect(after.hunks[0]!.newStart).toBe(25)
+      expect(after.hunks[0]!.lines[0]).toMatchObject({ content: 'line 25', newNumber: 25 })
+    }
+  })
+
+  it('keeps the revealed lines joined to the ones already there', () => {
+    const file = leading()
+    const gap = gapsIn(file).find((g) => g.after === -1)!
+    const after = expandGap(file, gap, source(60), 'down', 5)
+
+    const numbers = after.hunks[0]!.lines.map((l) => l.newNumber)
+    for (let i = 1; i < numbers.length; i += 1) expect(numbers[i]).toBe(numbers[i - 1]! + 1)
+  })
+
+  it('opens the space after the last hunk from the top, whichever way it is asked', () => {
+    const file = fileOf(hunk(1, 1, '  '))
+    const gap = gapsIn(file, 40).at(-1)!
+
+    for (const direction of ['up', 'down'] as const) {
+      const after = expandGap(file, gap, source(40), direction, 5)
+      expect(after.hunks[0]!.lines.at(-1)).toMatchObject({ content: 'line 7', newNumber: 7 })
+    }
+  })
+
+  it('still lets a gap between two hunks be opened from either end', () => {
+    const file = fileOf(hunk(1, 1, '  '), hunk(40, 40, '  '))
+    const gap = gapsIn(file).find((g) => g.after === 0 && g.before === 1)!
+
+    const down = expandGap(file, gap, source(60), 'down', 5)
+    expect(down.hunks[0]!.lines.at(-1)).toMatchObject({ newNumber: 7 })
+
+    const up = expandGap(file, gap, source(60), 'up', 5)
+    expect(up.hunks[1]!.lines[0]).toMatchObject({ newNumber: 35 })
+  })
+})

@@ -175,16 +175,24 @@ export type GapState = 'idle' | 'loading' | { readonly error: string }
  * above wants the ones just below. Opening the whole gap is a third, and its
  * size is on the label, since "expand" without a number hides whether the
  * next click costs twenty lines or two thousand.
+ *
+ * A gap with a hunk on only one side gets only the arrow that points at it.
+ * The other would have to mean "the far end of the gap", which is a stretch
+ * of file joined to nothing.
  */
 export function GapRow({
   hidden,
   chunk,
   state,
+  hunkAbove,
+  hunkBelow,
   onExpand,
 }: {
   readonly hidden: number
   readonly chunk: number
   readonly state: GapState
+  readonly hunkAbove: boolean
+  readonly hunkBelow: boolean
   readonly onExpand: (direction: 'up' | 'down' | 'all') => void
 }) {
   const step = Math.min(chunk, hidden)
@@ -202,28 +210,32 @@ export function GapRow({
         </span>
       ) : (
         <>
-          <button
-            type="button"
-            tabIndex={-1}
-            disabled={busy}
-            onClick={() => {
-              onExpand('up')
-            }}
-            className="rounded border border-neutral-700 px-2 py-0.5 text-neutral-300 hover:bg-neutral-700/50 disabled:opacity-50"
-          >
-            ↑ {step}
-          </button>
-          <button
-            type="button"
-            tabIndex={-1}
-            disabled={busy}
-            onClick={() => {
-              onExpand('down')
-            }}
-            className="rounded border border-neutral-700 px-2 py-0.5 text-neutral-300 hover:bg-neutral-700/50 disabled:opacity-50"
-          >
-            ↓ {step}
-          </button>
+          {hunkBelow ? (
+            <button
+              type="button"
+              tabIndex={-1}
+              disabled={busy}
+              onClick={() => {
+                onExpand('up')
+              }}
+              className="rounded border border-neutral-700 px-2 py-0.5 text-neutral-300 hover:bg-neutral-700/50 disabled:opacity-50"
+            >
+              ↑ {step}
+            </button>
+          ) : null}
+          {hunkAbove ? (
+            <button
+              type="button"
+              tabIndex={-1}
+              disabled={busy}
+              onClick={() => {
+                onExpand('down')
+              }}
+              className="rounded border border-neutral-700 px-2 py-0.5 text-neutral-300 hover:bg-neutral-700/50 disabled:opacity-50"
+            >
+              ↓ {step}
+            </button>
+          ) : null}
           {hidden > step ? (
             <button
               type="button"

@@ -544,6 +544,8 @@ function Row({
           hidden={hidden}
           chunk={CONTEXT_LINES}
           state={expansion.stateOf(file, gap)}
+          hunkAbove={gap.after !== -1}
+          hunkBelow={gap.before !== -1}
           onExpand={(direction) => {
             expansion.expand(file, gap, direction)
           }}
