@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Toaster } from './ui/sonner'
 import { SourcePicker } from './SourcePicker'
 
 const field = (): HTMLElement => screen.getByLabelText('Paste a pull request link')
@@ -238,7 +239,12 @@ describe('the button keeps its size while it works', () => {
 describe('choosing a file as well as dropping one', () => {
   const field = (): HTMLInputElement => screen.getByLabelText(/Drop a .diff or .patch here/)
 
-  const fileOf = (text: string): File => new File([text], 'change.diff', { type: 'text/plain' })
+  const DIFF = ['diff --git a/a b/a', '--- a/a', '+++ b/a', '@@ -1 +1 @@', '-old', '+new', ''].join(
+    String.fromCharCode(10),
+  )
+
+  const fileOf = (text: string, name = 'change.diff'): File =>
+    new File([text], name, { type: 'text/plain' })
 
   it('offers a real file input, reachable by keyboard', () => {
     render(<SourcePicker onLoad={vi.fn()} />)
@@ -259,9 +265,9 @@ describe('choosing a file as well as dropping one', () => {
     const onLoad = vi.fn()
     render(<SourcePicker onLoad={onLoad} />)
 
-    fireEvent.change(field(), { target: { files: [fileOf('diff --git a/a b/a\n')] } })
+    fireEvent.change(field(), { target: { files: [fileOf(DIFF)] } })
     await waitFor(() => {
-      expect(onLoad).toHaveBeenCalledWith('diff --git a/a b/a\n', null)
+      expect(onLoad).toHaveBeenCalledWith(DIFF, null)
     })
   })
 
@@ -270,9 +276,9 @@ describe('choosing a file as well as dropping one', () => {
     render(<SourcePicker onLoad={onLoad} />)
 
     const zone = field().closest('label')!
-    fireEvent.drop(zone, { dataTransfer: { files: [fileOf('diff --git a/b b/b\n')] } })
+    fireEvent.drop(zone, { dataTransfer: { files: [fileOf(DIFF)] } })
     await waitFor(() => {
-      expect(onLoad).toHaveBeenCalledWith('diff --git a/b b/b\n', null)
+      expect(onLoad).toHaveBeenCalledWith(DIFF, null)
     })
   })
 
@@ -282,7 +288,7 @@ describe('choosing a file as well as dropping one', () => {
 
     // The input is cleared after each read, or the second choice of the same
     // file fires no change event at all.
-    fireEvent.change(field(), { target: { files: [fileOf('one')] } })
+    fireEvent.change(field(), { target: { files: [fileOf(DIFF)] } })
     await waitFor(() => {
       expect(onLoad).toHaveBeenCalledOnce()
     })
@@ -302,5 +308,67 @@ describe('choosing a file as well as dropping one', () => {
     const zone = field().closest('label')!
     expect(zone.className).toContain('focus-within:outline-2')
     expect(zone.className).toContain('focus-within:outline-sky-400')
+  })
+})
+
+/**
+ * Before this, dropping a picture rendered an empty diff and the viewer said
+ * "nothing to show" — true, and no help at all.
+ */
+describe('saying whether the file could be read', () => {
+  const field = (): HTMLInputElement => screen.getByLabelText(/Drop a .diff or .patch here/)
+
+  const drop = (text: string, name: string): void => {
+    fireEvent.change(field(), {
+      target: { files: [new File([text], name, { type: 'text/plain' })] },
+    })
+  }
+
+  const DIFF = ['diff --git a/a b/a', '--- a/a', '+++ b/a', '@@ -1 +1 @@', '-old', '+new', ''].join(
+    String.fromCharCode(10),
+  )
+
+  const show = (onLoad = vi.fn()) =>
+    render(
+      <>
+        <Toaster />
+        <SourcePicker onLoad={onLoad} />
+      </>,
+    )
+
+  it('says so when one loads, and how much is in it', async () => {
+    show()
+    drop(DIFF, 'change.diff')
+    expect(await screen.findByText(/change\.diff — 1 file changed\./)).toBeInTheDocument()
+  })
+
+  it('refuses a picture and says it is not text', async () => {
+    const onLoad = vi.fn()
+    show(onLoad)
+
+    drop(String.fromCharCode(137) + 'PNG' + String.fromCharCode(0), 'shot.png')
+    expect(await screen.findByText(/shot\.png is not text/)).toBeInTheDocument()
+    expect(onLoad).not.toHaveBeenCalled()
+  })
+
+  it('refuses a file with no diff in it, and says what one looks like', async () => {
+    const onLoad = vi.fn()
+    show(onLoad)
+
+    drop('# Just a readme', 'README.md')
+    expect(await screen.findByText(/README\.md has no diff in it/)).toBeInTheDocument()
+    expect(onLoad).not.toHaveBeenCalled()
+  })
+
+  it('refuses something enormous without reading it', async () => {
+    const onLoad = vi.fn()
+    show(onLoad)
+
+    const huge = new File(['x'], 'holiday.mp4', { type: 'video/mp4' })
+    Object.defineProperty(huge, 'size', { value: 700 * 1024 * 1024 })
+    fireEvent.change(field(), { target: { files: [huge] } })
+
+    expect(await screen.findByText(/holiday\.mp4 is 700\.0 MB/)).toBeInTheDocument()
+    expect(onLoad).not.toHaveBeenCalled()
   })
 })

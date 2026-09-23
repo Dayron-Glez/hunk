@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { DiffView } from './components/DiffView'
 import { SourcePicker } from './components/SourcePicker'
 import { Button } from './components/ui/button'
+import { Toaster } from './components/ui/sonner'
 import { useExpansion } from './components/useExpansion'
 import type { DiffOrigin } from './core/expand/blobs'
 import type { PullRequestRef } from './core/source/github'
@@ -68,6 +69,7 @@ export function App() {
   if (loaded === null) {
     return (
       <main className="min-h-full bg-neutral-950 text-neutral-100">
+        <Toaster />
         <SourcePicker
           openOnMount={wanted}
           onLoad={(source, origin) => {
@@ -85,6 +87,7 @@ export function App() {
 
   return (
     <main className="flex h-full flex-col bg-neutral-950 text-neutral-100">
+      <Toaster />
       <div className="flex shrink-0 items-center gap-2 border-b border-neutral-800 px-4 py-2">
         <FileDiff aria-hidden className="size-4 text-sky-500" />
         <h1 className="font-mono text-sm font-semibold">hunk</h1>

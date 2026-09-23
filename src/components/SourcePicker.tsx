@@ -7,6 +7,8 @@ import {
   type PullRequestRef,
 } from '../core/source/github'
 import { FileDiff, GitPullRequest, Loader2, Upload } from 'lucide-react'
+import { toast } from 'sonner'
+import { acceptDiff, acceptSize, describeFileFailure } from '../core/source/file'
 import { cn } from '../lib/utils'
 import { Explain } from './Explain'
 import { describeFailure } from './loadFailure'
@@ -86,10 +88,32 @@ export function SourcePicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on the ref it was given
   }, [openOnMount])
 
-  /** A dropped file and a chosen one are the same thing once it is in hand. */
+  /**
+   * A dropped file and a chosen one are the same thing once it is in hand.
+   *
+   * Checked before it is shown, because the alternative was rendering a PNG
+   * as an empty diff and telling the reader "nothing to show", which is true
+   * and useless. Size first, so nothing enormous is read into a string at
+   * all.
+   */
   const readFile = (file: File | undefined): void => {
     if (file === undefined) return
+
+    const tooBig = acceptSize(file.name, file.size)
+    if (tooBig !== null) {
+      toast.error(describeFileFailure(tooBig))
+      return
+    }
+
     void file.text().then((text) => {
+      const result = acceptDiff(file.name, text)
+      if (!result.ok) {
+        toast.error(describeFileFailure(result.failure))
+        return
+      }
+      toast.success(
+        `${file.name} — ${result.files} ${result.files === 1 ? 'file' : 'files'} changed.`,
+      )
       onLoad(text, null)
     })
   }
