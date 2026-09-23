@@ -1,6 +1,11 @@
-import { useState, type DragEvent, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { pullRequestRef, type DiffOrigin } from '../core/expand/blobs'
-import { fetchPullRequestDiff, parsePullRequestUrl, type LoadFailure } from '../core/source/github'
+import {
+  fetchPullRequestDiff,
+  parsePullRequestUrl,
+  type LoadFailure,
+  type PullRequestRef,
+} from '../core/source/github'
 import { describeFailure } from './loadFailure'
 
 const samples = import.meta.glob<string>('../../fixtures/github/*.diff', {
@@ -23,8 +28,11 @@ const SAMPLE_ORDER = Object.keys(SAMPLE_LABELS)
 
 export function SourcePicker({
   onLoad,
+  openOnMount = null,
 }: {
   readonly onLoad: (source: string, origin: DiffOrigin | null) => void
+  /** A pull request the address bar already named, opened without a press. */
+  readonly openOnMount?: PullRequestRef | null
 }) {
   const [pasted, setPasted] = useState('')
   const [dragging, setDragging] = useState(false)
@@ -33,16 +41,7 @@ export function SourcePicker({
   const [fetching, setFetching] = useState(false)
   const [failure, setFailure] = useState<LoadFailure | null>(null)
 
-  const openPullRequest = (event: FormEvent): void => {
-    event.preventDefault()
-    if (fetching) return
-
-    const ref = parsePullRequestUrl(url)
-    if (ref === null) {
-      setFailure({ kind: 'unreadable', input: url })
-      return
-    }
-
+  const openRef = (ref: PullRequestRef): void => {
     setFailure(null)
     setFetching(true)
     void fetchPullRequestDiff(ref).then((result) => {
@@ -58,6 +57,29 @@ export function SourcePicker({
       } else setFailure(result.failure)
     })
   }
+
+  const openPullRequest = (event: FormEvent): void => {
+    event.preventDefault()
+    if (fetching) return
+
+    const ref = parsePullRequestUrl(url)
+    if (ref === null) {
+      setFailure({ kind: 'unreadable', input: url })
+      return
+    }
+    openRef(ref)
+  }
+
+  // A link straight to a pull request opens it without a press. Once: going
+  // back to the picker from one should leave the reader on the picker.
+  const opened = useRef(false)
+  useEffect(() => {
+    if (openOnMount === null || opened.current) return
+    opened.current = true
+    setUrl(`github.com/${openOnMount.owner}/${openOnMount.repo}/pull/${openOnMount.number}`)
+    openRef(openOnMount)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on the ref it was given
+  }, [openOnMount])
 
   const handleDrop = (event: DragEvent<HTMLDivElement>): void => {
     event.preventDefault()
