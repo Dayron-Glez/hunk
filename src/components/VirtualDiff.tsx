@@ -7,7 +7,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
-import { HighlightStore } from '../core/highlight/store'
+import { HighlightCache, HighlightStore } from '../core/highlight/store'
 import type { Direction, Gap } from '../core/expand/gaps'
 import { sizeOf } from '../core/expand/gaps'
 import { EXPAND_BY, Folding, type HunkRef } from '../core/layout/folding'
@@ -93,7 +93,11 @@ export function VirtualDiff({
   // Rebuilt on a mode change rather than kept for both: the second index costs
   // 10 ms on the kernel commit, and holding it costs 1 MB for as long as the
   // reader stays in the mode that does not use it.
-  const rows = useMemo(() => new RowIndex(diff, mode, expansion !== null), [diff, mode, expansion])
+  // Whether gaps can be opened, not who opens them. The expansion object is
+  // rebuilt whenever a gap starts or stops fetching, and depending on it here
+  // rebuilt the index — and everything under it — twice per click.
+  const expandable = expansion !== null
+  const rows = useMemo(() => new RowIndex(diff, mode, expandable), [diff, mode, expandable])
 
   // Kept by row of the full index, so a fold rebuilds the height tree without
   // losing what every row already measured.
@@ -149,19 +153,40 @@ export function VirtualDiff({
   // without the window having moved.
   const [coloured, setColoured] = useState(0)
 
-  const highlights = useMemo(() => {
-    const client = new HighlightClient()
-    const store = new HighlightStore(rows, client, () => {
-      setColoured((n) => n + 1)
-    })
-    return { client, store }
-  }, [rows])
-
+  // The worker outlives the row index. It loads Shiki and a grammar when it
+  // starts, so throwing it away whenever the document changes — a fold, a
+  // layout switch, an opened gap — paid that cost again every time.
+  const client = useMemo(() => new HighlightClient(), [])
   useEffect(
     () => () => {
-      highlights.client.dispose()
+      client.dispose()
     },
-    [highlights],
+    [client],
+  )
+
+  // What has been coloured outlives the store too, and for the same reason:
+  // the store is tied to a row index, and the index is rebuilt far more often
+  // than the hunks change. Keyed by hunk, so only the hunks that really
+  // changed are coloured again.
+  //
+  // For the life of the component, deliberately. `diff` would be the worst
+  // possible dependency — it is a new object after every expansion, which is
+  // the case this exists to survive — and it needs no other: loading a
+  // different diff goes through the picker, which unmounts this.
+  const cache = useMemo(() => new HighlightCache(), [])
+
+  // The store itself is tied to the rows it maps.
+  const store = useMemo(
+    () =>
+      new HighlightStore(
+        rows,
+        client,
+        () => {
+          setColoured((n) => n + 1)
+        },
+        cache,
+      ),
+    [rows, client, cache],
   )
 
   // Only what is on screen, plus the overscan the window already carries. The
@@ -169,8 +194,8 @@ export function VirtualDiff({
   const firstRow = folding.rowAt(view.first)
   const lastRow = folding.rowAt(view.last)
   useEffect(() => {
-    if (firstRow !== -1 && lastRow !== -1) highlights.store.requestRange(firstRow, lastRow)
-  }, [highlights, firstRow, lastRow])
+    if (firstRow !== -1 && lastRow !== -1) store.requestRange(firstRow, lastRow)
+  }, [store, firstRow, lastRow])
 
   const refresh = useCallback(() => {
     const scroller = scrollerRef.current
@@ -405,7 +430,7 @@ export function VirtualDiff({
           rows={rows}
           row={row}
           folding={folding}
-          store={highlights.store}
+          store={store}
           expansion={expansion}
           onToggleFile={toggleFile}
           onToggleHunk={toggleHunk}

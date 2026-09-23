@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SourcePicker } from './SourcePicker'
 
-const field = (): HTMLElement => screen.getByLabelText('Open a pull request')
-const open = (): HTMLElement => screen.getByRole('button', { name: /^Open/ })
+const field = (): HTMLElement => screen.getByLabelText('Paste a pull request link')
+const open = (): HTMLElement => screen.getByRole('button', { name: /^Read/ })
 
 const type = (text: string): void => {
   fireEvent.change(field(), { target: { value: text } })
@@ -68,7 +68,7 @@ describe('opening a pull request by link', () => {
     type('vitejs/vite#23346')
     fireEvent.click(open())
 
-    expect(open()).toHaveTextContent('Opening…')
+    expect(open()).toHaveTextContent('Reading…')
     expect(open()).toBeDisabled()
     fireEvent.click(open())
     expect(held.calls).toHaveLength(1)

@@ -88,7 +88,7 @@ export function SourcePicker({
 
       <form onSubmit={openPullRequest} className="flex flex-col gap-2">
         <label htmlFor="pr-url" className="text-sm text-neutral-400">
-          Open a pull request
+          Paste a pull request link
         </label>
         <div className="flex gap-2">
           <input
@@ -111,7 +111,7 @@ export function SourcePicker({
             disabled={url.trim() === '' || fetching}
             className="shrink-0 rounded-md bg-sky-700 px-3 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {fetching ? 'Opening…' : 'Open'}
+            {fetching ? 'Reading…' : 'Read it'}
           </button>
         </div>
         {failure === null ? (
