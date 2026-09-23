@@ -19,5 +19,11 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'tests/**/*.test.{ts,tsx}'],
+    // The invariants run over the whole corpus, and the corpus contains a
+    // 758-file kernel commit: two of them take six to nine seconds on their
+    // own. At the default five they passed on a quiet machine and failed on a
+    // busy one, which is a test reporting the load average rather than the
+    // code.
+    testTimeout: 30_000,
   },
 })

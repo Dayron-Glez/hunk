@@ -1,7 +1,9 @@
 import { createEvent, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readFixture } from '../../tests/fixtures'
+import type { Direction, Gap } from '../core/expand/gaps'
 import { EXPAND_BY, Folding, LARGE_HUNK } from '../core/layout/folding'
+import type { GapState } from './rows'
 import { RowIndex } from '../core/layout/rowIndex'
 import { parseUnifiedDiff } from '../core/parse/unified'
 import { VirtualDiff } from './VirtualDiff'
@@ -706,5 +708,126 @@ describe('long lines in two columns', () => {
     const event = createEvent.keyDown(grid(), { key: 'ArrowRight' })
     fireEvent(grid(), event)
     expect(event.defaultPrevented).toBe(false)
+  })
+})
+
+/**
+ * The unchanged lines a diff left out. Offered only when the diff came from
+ * somewhere they can be fetched — a pasted file says nothing about where the
+ * rest of it lives.
+ */
+describe('the lines the diff left out', () => {
+  const expansionSpy = () => {
+    const calls: { file: number; from: number; direction: string }[] = []
+    let state: GapState = 'idle'
+    return {
+      calls,
+      setState: (next: GapState) => {
+        state = next
+      },
+      value: {
+        stateOf: () => state,
+        expand: (file: number, gap: Gap, direction: Direction) => {
+          calls.push({ file, from: gap.newFrom, direction })
+        },
+      },
+    }
+  }
+
+  it('offers nothing when the diff was pasted', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+    expect(screen.queryByText(/unchanged lines/)).not.toBeInTheDocument()
+  })
+
+  it('offers each gap, with how much it hides', () => {
+    globalThis.testViewportHeight = 100_000
+    const spy = expansionSpy()
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} expansion={spy.value} />)
+
+    // Both files of that pull request start well past line one.
+    expect(screen.getAllByText(/unchanged lines$/)).toHaveLength(2)
+    expect(screen.getByText('591 unchanged lines')).toBeInTheDocument()
+  })
+
+  /**
+   * A gap before the first hunk has nothing above it, so the only lines it can
+   * reveal are the ones touching the hunk below. Offering the other direction
+   * put line 1 of the file directly before line 4.428 on a real pull request.
+   */
+  it('offers only the arrow that points at a hunk', () => {
+    globalThis.testViewportHeight = 100_000
+    const spy = expansionSpy()
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} expansion={spy.value} />)
+
+    // Both files of that pull request start past line one and have one hunk.
+    expect(screen.getAllByRole('button', { name: '↑ 20' }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: '↓ 20' })).not.toBeInTheDocument()
+  })
+
+  it('offers both ends of a gap that has a hunk on each side', () => {
+    globalThis.testViewportHeight = 100_000
+    const spy = expansionSpy()
+    // Seven of that pull request's gaps sit between two hunks. The label
+    // carries the step, which is the gap's own size when it is under a chunk.
+    render(<VirtualDiff diff={diffOf('vite-pr-23378-new-files.diff')} expansion={spy.value} />)
+
+    fireEvent.click(screen.getAllByRole('button', { name: /^↓ / })[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: /^↑ / })[0]!)
+    expect(spy.calls.map((c) => c.direction)).toEqual(['down', 'up'])
+  })
+
+  it('asks for the end the reader pressed', () => {
+    globalThis.testViewportHeight = 100_000
+    const spy = expansionSpy()
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} expansion={spy.value} />)
+
+    fireEvent.click(screen.getAllByRole('button', { name: '↑ 20' })[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: /^All / })[0]!)
+
+    expect(spy.calls.map((c) => c.direction)).toEqual(['up', 'all'])
+    expect(new Set(spy.calls.map((c) => c.from)).size).toBe(1)
+  })
+
+  it('says so while it is fetching, and stops taking presses', () => {
+    globalThis.testViewportHeight = 100_000
+    const spy = expansionSpy()
+    spy.setState('loading')
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} expansion={spy.value} />)
+
+    expect(screen.getAllByText('Fetching the file…')[0]).toBeInTheDocument()
+    for (const button of screen.getAllByRole('button', { name: '↑ 20' })) {
+      expect(button).toBeDisabled()
+    }
+  })
+
+  it('puts the reason in place of the controls when it could not', () => {
+    globalThis.testViewportHeight = 100_000
+    const spy = expansionSpy()
+    spy.setState({ error: 'This file has changed since the diff was loaded.' })
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} expansion={spy.value} />)
+
+    expect(screen.getAllByRole('alert')[0]).toHaveTextContent('has changed since')
+    expect(screen.queryByRole('button', { name: '↑ 20' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the gap out of the tab order like every other row control', () => {
+    globalThis.testViewportHeight = 100_000
+    const spy = expansionSpy()
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} expansion={spy.value} />)
+
+    for (const button of screen.getAllByRole('button', { name: /^[↑↓]/ })) {
+      expect(button).toHaveAttribute('tabindex', '-1')
+    }
+  })
+
+  it('gives the gap a row of the grid like anything else', () => {
+    globalThis.testViewportHeight = 100_000
+    const spy = expansionSpy()
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} expansion={spy.value} />)
+
+    const gap = screen.getByText('591 unchanged lines').closest('[role="row"]')
+    expect(gap).not.toBeNull()
+    expect(gap!.querySelectorAll('[role="gridcell"]')).toHaveLength(1)
   })
 })

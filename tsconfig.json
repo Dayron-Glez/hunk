@@ -4,5 +4,14 @@
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.test.json" },
     { "path": "./tsconfig.node.json" }
-  ]
+  ],
+  // Nothing is compiled from here — the references do that. The alias is
+  // repeated because tools that are not tsc look for it in the root file, and
+  // shadcn's generator is one of them.
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
 }

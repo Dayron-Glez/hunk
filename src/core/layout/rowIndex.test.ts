@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { readFixture } from '../../../tests/fixtures'
 import { parseUnifiedDiff } from '../parse/unified'
-import { RowIndex, type RowKind } from './rowIndex'
+import { RowIndex, RowKind } from './rowIndex'
 
 const NAMES: Record<RowKind, string> = {
   0: 'file-header',
   1: 'note',
   2: 'hunk-header',
   3: 'line',
+  4: 'gap',
 }
 
 const shapeOf = (index: RowIndex): string[] =>
@@ -266,5 +267,86 @@ describe.each([
 
   it('needs fewer rows than the unified view of the same diff', () => {
     expect(index.length).toBeLessThanOrEqual(new RowIndex(diff).length)
+  })
+})
+
+/**
+ * A row wherever the diff left unchanged lines out — but only for a diff that
+ * came from somewhere those lines can be fetched. A pasted `.diff` carries no
+ * repository, and a button that cannot do anything is worse than no button.
+ */
+describe('rows for what the diff left out', () => {
+  const load = (set: 'github' | 'edge', name: string) => parseUnifiedDiff(readFixture(set, name))
+
+  it('adds none unless the diff can be expanded', () => {
+    const diff = load('github', 'vite-pr-23346-normal.diff')
+    const plain = new RowIndex(diff)
+    for (let row = 0; row < plain.length; row += 1) {
+      expect(plain.kindAt(row)).not.toBe(RowKind.Gap)
+      expect(plain.gapAt(row)).toBeNull()
+    }
+  })
+
+  it('adds one above each hunk that has lines hidden before it', () => {
+    const diff = load('github', 'vite-pr-23346-normal.diff')
+    const expandable = new RowIndex(diff, 'unified', true)
+
+    let gapRows = 0
+    for (let row = 0; row < expandable.length; row += 1) {
+      if (expandable.kindAt(row) !== RowKind.Gap) continue
+      gapRows += 1
+      expect(expandable.gapAt(row)).not.toBeNull()
+      // It sits directly above the hunk header it runs into.
+      expect(expandable.kindAt(row + 1)).toBe(RowKind.HunkHeader)
+      expect(expandable.hunkIndexAt(row)).toBe(expandable.hunkIndexAt(row + 1))
+    }
+    // Both files of that pull request start well past line one.
+    expect(gapRows).toBe(2)
+    expect(expandable.length).toBe(new RowIndex(diff).length + 2)
+  })
+
+  it('offers nothing after the last hunk, whose end is unknown', () => {
+    const diff = load('github', 'vite-pr-23346-normal.diff')
+    const expandable = new RowIndex(diff, 'unified', true)
+
+    for (let row = 0; row < expandable.length; row += 1) {
+      const gap = expandable.gapAt(row)
+      if (gap !== null) expect(gap.before).not.toBe(-1)
+    }
+  })
+
+  it('works the same in two columns', () => {
+    const diff = load('github', 'vite-pr-23346-normal.diff')
+    const split = new RowIndex(diff, 'split', true)
+    const plain = new RowIndex(diff, 'split')
+    expect(split.length).toBe(plain.length + 2)
+  })
+
+  it('adds none to a file that was only added or only deleted', () => {
+    const diff = load('github', 'vite-pr-23378-new-files.diff')
+    const expandable = new RowIndex(diff, 'unified', true)
+
+    for (let row = 0; row < expandable.length; row += 1) {
+      if (expandable.kindAt(row) !== RowKind.Gap) continue
+      const file = expandable.fileAt(row)
+      expect(file.oldPath).not.toBeNull()
+      expect(file.newPath).not.toBeNull()
+    }
+  })
+
+  it('points every gap row at the file and hunk it belongs to', () => {
+    const diff = load('github', 'linux-93e4b307-huge.diff')
+    const expandable = new RowIndex(diff, 'unified', true)
+
+    let checked = 0
+    for (let row = 0; row < expandable.length; row += 1) {
+      const gap = expandable.gapAt(row)
+      if (gap === null) continue
+      checked += 1
+      const hunk = expandable.fileAt(row).hunks[gap.before]!
+      expect(expandable.hunkIndexAt(row)).toBe(gap.before)
+      expect(gap.newTo).toBe(hunk.newStart - 1)
+    }
+    expect(checked).toBeGreaterThan(100)
   })
 })
