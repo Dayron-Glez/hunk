@@ -163,3 +163,87 @@ export function ExpanderRow({
     </div>
   )
 }
+
+/** How a gap row is getting on: nothing yet, fetching, or why it failed. */
+export type GapState = 'idle' | 'loading' | { readonly error: string }
+
+/**
+ * The unchanged lines a diff left out, offered rather than shown.
+ *
+ * Up and down rather than one control, because which end matters: a reader
+ * on the hunk below wants the lines just above it, and a reader on the hunk
+ * above wants the ones just below. Opening the whole gap is a third, and its
+ * size is on the label, since "expand" without a number hides whether the
+ * next click costs twenty lines or two thousand.
+ */
+export function GapRow({
+  hidden,
+  chunk,
+  state,
+  onExpand,
+}: {
+  readonly hidden: number
+  readonly chunk: number
+  readonly state: GapState
+  readonly onExpand: (direction: 'up' | 'down' | 'all') => void
+}) {
+  const step = Math.min(chunk, hidden)
+  const busy = state === 'loading'
+  const failed = typeof state === 'object'
+
+  return (
+    <div
+      role="gridcell"
+      className="flex w-max min-w-full items-center gap-2 border-y border-neutral-800 bg-sky-500/5 px-3 py-1.5 text-xs"
+    >
+      {failed ? (
+        <span role="alert" className="text-amber-200/90">
+          {state.error}
+        </span>
+      ) : (
+        <>
+          <button
+            type="button"
+            tabIndex={-1}
+            disabled={busy}
+            onClick={() => {
+              onExpand('up')
+            }}
+            className="rounded border border-neutral-700 px-2 py-0.5 text-neutral-300 hover:bg-neutral-700/50 disabled:opacity-50"
+          >
+            ↑ {step}
+          </button>
+          <button
+            type="button"
+            tabIndex={-1}
+            disabled={busy}
+            onClick={() => {
+              onExpand('down')
+            }}
+            className="rounded border border-neutral-700 px-2 py-0.5 text-neutral-300 hover:bg-neutral-700/50 disabled:opacity-50"
+          >
+            ↓ {step}
+          </button>
+          {hidden > step ? (
+            <button
+              type="button"
+              tabIndex={-1}
+              disabled={busy}
+              onClick={() => {
+                onExpand('all')
+              }}
+              className="rounded px-2 py-0.5 text-neutral-400 hover:text-neutral-200 disabled:opacity-50"
+            >
+              All {hidden.toLocaleString('en-US')}
+            </button>
+          ) : null}
+          <span className="text-neutral-400">
+            {busy
+              ? 'Fetching the file…'
+              : `${hidden.toLocaleString('en-US')} unchanged ${hidden === 1 ? 'line' : 'lines'}`}
+          </span>
+        </>
+      )}
+    </div>
+  )
+}

@@ -1,4 +1,5 @@
 import { useState, type DragEvent, type FormEvent } from 'react'
+import { pullRequestRef, type DiffOrigin } from '../core/expand/blobs'
 import { fetchPullRequestDiff, parsePullRequestUrl, type LoadFailure } from '../core/source/github'
 import { describeFailure } from './loadFailure'
 
@@ -20,7 +21,11 @@ const SAMPLE_LABELS: Record<string, string> = {
 
 const SAMPLE_ORDER = Object.keys(SAMPLE_LABELS)
 
-export function SourcePicker({ onLoad }: { readonly onLoad: (source: string) => void }) {
+export function SourcePicker({
+  onLoad,
+}: {
+  readonly onLoad: (source: string, origin: DiffOrigin | null) => void
+}) {
   const [pasted, setPasted] = useState('')
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
@@ -42,8 +47,15 @@ export function SourcePicker({ onLoad }: { readonly onLoad: (source: string) => 
     setFetching(true)
     void fetchPullRequestDiff(ref).then((result) => {
       setFetching(false)
-      if (result.ok) onLoad(result.diff)
-      else setFailure(result.failure)
+      if (result.ok) {
+        // Only a diff fetched from a pull request knows where the rest of its
+        // files live, which is what lets the reader open the gaps in it.
+        onLoad(result.diff, {
+          owner: ref.owner,
+          repo: ref.repo,
+          ref: pullRequestRef(ref.number),
+        })
+      } else setFailure(result.failure)
     })
   }
 
@@ -52,7 +64,9 @@ export function SourcePicker({ onLoad }: { readonly onLoad: (source: string) => 
     setDragging(false)
     const file = event.dataTransfer.files[0]
     if (file === undefined) return
-    void file.text().then(onLoad)
+    void file.text().then((text) => {
+      onLoad(text, null)
+    })
   }
 
   const loadSample = (name: string): void => {
@@ -61,7 +75,7 @@ export function SourcePicker({ onLoad }: { readonly onLoad: (source: string) => 
     setBusy(name)
     void entry[1]().then((text) => {
       setBusy(null)
-      onLoad(text)
+      onLoad(text, null)
     })
   }
 
@@ -150,7 +164,7 @@ export function SourcePicker({ onLoad }: { readonly onLoad: (source: string) => 
           type="button"
           disabled={pasted.trim() === ''}
           onClick={() => {
-            onLoad(pasted)
+            onLoad(pasted, null)
           }}
           className="self-start rounded-md bg-sky-700 px-3 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
         >

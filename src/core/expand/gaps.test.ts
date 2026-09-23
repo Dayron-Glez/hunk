@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFixture } from '../../../tests/fixtures'
 import { parseUnifiedDiff } from '../parse/unified'
 import type { DiffFile, Hunk } from '../parse/types'
-import { expandGap, fileMatchesDiff, gapsIn, sizeOf } from './gaps'
+import { expandGap, expandInDiff, fileMatchesDiff, gapsIn, sizeOf } from './gaps'
 
 /** A file of numbered lines, so a revealed line says where it came from. */
 const source = (count: number): string[] => Array.from({ length: count }, (_, i) => `line ${i + 1}`)
@@ -356,5 +356,40 @@ describe('refusing a file that has moved on', () => {
 
   it('has nothing to disagree with in a file of no hunks', () => {
     expect(fileMatchesDiff(fileOf(), [])).toBe(true)
+  })
+})
+
+describe('applying it to the whole diff', () => {
+  const diffOf = (...files: DiffFile[]) => ({
+    files,
+    additions: 0,
+    deletions: 0,
+    warnings: [],
+  })
+
+  it('replaces only the file that was expanded', () => {
+    const a = fileOf(hunk(1, 1, '  '), hunk(20, 20, '  '))
+    const b = fileOf(hunk(1, 1, '  '))
+    const diff = diffOf(a, b)
+    const gap = gapsIn(a).find((g) => g.after === 0)!
+
+    const after = expandInDiff(diff, 0, gap, source(40), 'all', 20)
+    expect(after.files[0]).not.toBe(a)
+    expect(after.files[1]).toBe(b)
+    expect(after).not.toBe(diff)
+  })
+
+  it('hands back the same diff when nothing was revealed', () => {
+    const file = fileOf(hunk(1, 1, '  '))
+    const diff = diffOf(file)
+    const open = gapsIn(file).at(-1)!
+    expect(expandInDiff(diff, 0, open, source(10), 'down', 4)).toBe(diff)
+  })
+
+  it('ignores a file index that is not there', () => {
+    const file = fileOf(hunk(1, 1, '  '), hunk(20, 20, '  '))
+    const diff = diffOf(file)
+    const gap = gapsIn(file).find((g) => g.after === 0)!
+    expect(expandInDiff(diff, 7, gap, source(40), 'all', 20)).toBe(diff)
   })
 })

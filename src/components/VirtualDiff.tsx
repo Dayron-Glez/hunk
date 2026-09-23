@@ -8,6 +8,8 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
 import { HighlightStore } from '../core/highlight/store'
+import type { Direction, Gap } from '../core/expand/gaps'
+import { sizeOf } from '../core/expand/gaps'
 import { EXPAND_BY, Folding, type HunkRef } from '../core/layout/folding'
 import { MeasuredHeights } from '../core/layout/measuredHeights'
 import { moveFrom, startingPosition, type Move } from '../core/layout/navigation'
@@ -16,7 +18,7 @@ import { Virtualizer, type VisibleWindow } from '../core/layout/virtualizer'
 import type { ParsedDiff } from '../core/parse/types'
 import { HighlightClient } from '../workers/highlightClient'
 import { DiffRow, SplitDiffRow } from './DiffRow'
-import { ExpanderRow, FileHeaderRow, HunkHeaderRow, NoteRow } from './rows'
+import { ExpanderRow, FileHeaderRow, GapRow, HunkHeaderRow, NoteRow, type GapState } from './rows'
 
 /** Starting points only — every row that reaches the screen is measured. They
  *  keep the scrollbar roughly right on the first frame. */
@@ -52,6 +54,16 @@ const ACTIVE_ROW = 'outline outline-1 -outline-offset-1 outline-sky-400/80'
 /** How far one press pans a line too wide for its column. */
 const PAN_PX = 120
 
+/** Unchanged lines one press of an arrow on a gap brings back. */
+const CONTEXT_LINES = 20
+
+/** Fetching the lines a diff left out, when the diff came from somewhere they
+ *  can be fetched from. Null for a diff that was pasted or dropped. */
+export interface Expansion {
+  readonly stateOf: (fileIndex: number, gap: Gap) => GapState
+  readonly expand: (fileIndex: number, gap: Gap, direction: Direction) => void
+}
+
 /** Stable per position, which is what `aria-activedescendant` needs to name. */
 const rowElementId = (position: number): string => `diff-row-${position}`
 
@@ -72,14 +84,16 @@ interface Layout {
 export function VirtualDiff({
   diff,
   mode = 'unified',
+  expansion = null,
 }: {
   readonly diff: ParsedDiff
   readonly mode?: LayoutMode
+  readonly expansion?: Expansion | null
 }) {
   // Rebuilt on a mode change rather than kept for both: the second index costs
   // 10 ms on the kernel commit, and holding it costs 1 MB for as long as the
   // reader stays in the mode that does not use it.
-  const rows = useMemo(() => new RowIndex(diff, mode), [diff, mode])
+  const rows = useMemo(() => new RowIndex(diff, mode, expansion !== null), [diff, mode, expansion])
 
   // Kept by row of the full index, so a fold rebuilds the height tree without
   // losing what every row already measured.
@@ -392,6 +406,7 @@ export function VirtualDiff({
           row={row}
           folding={folding}
           store={highlights.store}
+          expansion={expansion}
           onToggleFile={toggleFile}
           onToggleHunk={toggleHunk}
         />
@@ -481,6 +496,7 @@ function Row({
   row,
   folding,
   store,
+  expansion,
   onToggleFile,
   onToggleHunk,
 }: {
@@ -488,10 +504,27 @@ function Row({
   readonly row: number
   readonly folding: Folding
   readonly store: HighlightStore
+  readonly expansion: Expansion | null
   readonly onToggleFile: (file: number) => void
   readonly onToggleHunk: (ref: HunkRef) => void
 }) {
   switch (rows.kindAt(row)) {
+    case RowKind.Gap: {
+      const gap = rows.gapAt(row)
+      const hidden = gap === null ? null : sizeOf(gap)
+      if (gap === null || hidden === null || expansion === null) return null
+      const file = rows.fileIndexAt(row)
+      return (
+        <GapRow
+          hidden={hidden}
+          chunk={CONTEXT_LINES}
+          state={expansion.stateOf(file, gap)}
+          onExpand={(direction) => {
+            expansion.expand(file, gap, direction)
+          }}
+        />
+      )
+    }
     case RowKind.FileHeader: {
       const file = rows.fileIndexAt(row)
       return (

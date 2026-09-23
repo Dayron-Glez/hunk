@@ -1,4 +1,4 @@
-import type { DiffFile, DiffLine, Hunk } from '../parse/types'
+import type { DiffFile, DiffLine, Hunk, ParsedDiff } from '../parse/types'
 
 /**
  * Unchanged lines a diff left out, between or around its hunks.
@@ -170,6 +170,33 @@ export function expandGap(
   }
 
   return { ...file, hunks }
+}
+
+/**
+ * The whole diff with one file's gap opened.
+ *
+ * Expanding genuinely changes the document, so this returns a new diff and
+ * everything downstream is rebuilt from it — the row index, the heights, the
+ * folding. That costs what a fold costs, which F4 measured at 10 to 25 ms,
+ * and it happens on a click rather than on a frame.
+ */
+export function expandInDiff(
+  diff: ParsedDiff,
+  fileIndex: number,
+  gap: Gap,
+  source: readonly string[],
+  direction: Direction,
+  chunk: number,
+): ParsedDiff {
+  const file = diff.files[fileIndex]
+  if (file === undefined) return diff
+
+  const expanded = expandGap(file, gap, source, direction, chunk)
+  if (expanded === file) return diff
+
+  const files = [...diff.files]
+  files[fileIndex] = expanded
+  return { ...diff, files }
 }
 
 /** Context lines for a run of the new file, numbered on both sides. */

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { LayoutMode } from '../core/layout/rowIndex'
 import type { ParsedDiff } from '../core/parse/types'
-import { VirtualDiff } from './VirtualDiff'
+import { VirtualDiff, type Expansion } from './VirtualDiff'
 
 const MODES: readonly { readonly mode: LayoutMode; readonly label: string }[] = [
   { mode: 'unified', label: 'Unified' },
@@ -11,11 +11,13 @@ const MODES: readonly { readonly mode: LayoutMode; readonly label: string }[] = 
 export function DiffView({
   diff,
   initialMode = 'unified',
+  expansion = null,
 }: {
   readonly diff: ParsedDiff
   /** Which layout to open in. The benchmark uses it to measure a first paint
    *  in either one; a reader's own choice lives in the state below. */
   readonly initialMode?: LayoutMode
+  readonly expansion?: Expansion | null
 }) {
   const [mode, setMode] = useState<LayoutMode>(initialMode)
 
@@ -64,7 +66,7 @@ export function DiffView({
       ) : null}
 
       <div className="min-h-0 flex-1 border-t border-neutral-800">
-        <VirtualDiff diff={diff} mode={mode} />
+        <VirtualDiff diff={diff} mode={mode} expansion={expansion} />
       </div>
     </div>
   )

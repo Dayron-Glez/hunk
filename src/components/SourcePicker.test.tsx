@@ -49,7 +49,14 @@ describe('opening a pull request by link', () => {
     expect(held.calls).toEqual(['https://api.github.com/repos/vitejs/vite/pulls/23346'])
     held.settle(new Response('diff --git a/x b/x\n', { status: 200 }))
     await waitFor(() => {
-      expect(onLoad).toHaveBeenCalledWith('diff --git a/x b/x\n')
+      expect(onLoad).toHaveBeenCalledOnce()
+    })
+    // With where the rest of its files live, which is what lets the reader
+    // open the unchanged lines the diff left out.
+    expect(onLoad).toHaveBeenCalledWith('diff --git a/x b/x\n', {
+      owner: 'vitejs',
+      repo: 'vite',
+      ref: 'refs/pull/23346/head',
     })
   })
 
@@ -152,7 +159,9 @@ describe('the other ways in still work', () => {
       target: { value: 'diff --git a/a b/a\n' },
     })
     fireEvent.click(screen.getByRole('button', { name: 'Render it' }))
-    expect(onLoad).toHaveBeenCalledWith('diff --git a/a b/a\n')
+    // No origin: a pasted diff says nothing about where its files could be
+    // found, so there is nothing to offer to expand.
+    expect(onLoad).toHaveBeenCalledWith('diff --git a/a b/a\n', null)
   })
 
   it('offers the real diffs it ships with', () => {
