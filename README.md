@@ -3,10 +3,11 @@
 A diff viewer for the files that bring the others down. Paste a GitHub pull request URL, drop
 two files or a `.patch`, and read it.
 
-> **Status: F4 complete — every target is met, with room to spare.**
+> **Status: F5 complete — every target is met, with room to spare.**
 > Variable-height virtualization, syntax highlighting that arrives from a worker without
-> touching first paint, the change inside a line marked word by word in one column or two, and
-> the whole thing foldable and readable from the keyboard. The numbers below are measured and
+> touching first paint, the change inside a line marked word by word in one column or two, the
+> whole thing foldable and readable from the keyboard, and a pull request opened from its link
+> — public or, with a token of your own, private. The numbers below are measured and
 > reproducible.
 
 ## Where it stands today
@@ -18,21 +19,27 @@ they do. An edited line shows which words changed, and the two versions can be r
 side. Files and hunks fold, a hunk too large to scroll past opens in chunks, and the whole diff
 is one tab stop that the keyboard walks.
 
+A pull request opens from the link you paste, at an address you can share and leave with the
+back button. The unchanged lines `-U3` left out are fetched and put back where they belong,
+checked against the diff first so a branch that moved since cannot quietly show you the wrong
+ones. Reading a private repository takes a token you make and keep; it is checked before it is
+kept, sent to one host, and never put in the address bar.
+
 Measured on an AMD Ryzen 7 5800H against a production build, median of three runs each in a
 fresh page.
 
 | Case                     |   Lines | Before | **First paint** | Side by side | One fold | Memory | DOM nodes |
 | ------------------------ | ------: | -----: | --------------: | -----------: | -------: | -----: | --------: |
-| Synthetic                |   1,000 |  71 ms |       **36 ms** |        43 ms |     6 ms |   4 MB |     2,523 |
-| Synthetic                |  10,000 | 429 ms |       **47 ms** |        48 ms |    10 ms |   4 MB |     2,450 |
-| Synthetic                |  50,000 | 2.17 s |       **54 ms** |        67 ms |    14 ms |   7 MB |     2,303 |
-| Synthetic                | 100,000 | 4.52 s |       **64 ms** |        77 ms |    23 ms |  10 MB |     2,517 |
-| Synthetic, real edits    | 100,000 |      — |       **64 ms** |        74 ms |    23 ms |  10 MB |     2,489 |
-| Linux kernel commit      |  62,165 | 3.07 s |       **63 ms** |        70 ms |    10 ms |   8 MB |     1,770 |
-| Minified bundles, 371 KB |     128 |  52 ms |       **68 ms** |        71 ms |     5 ms |   3 MB |     1,624 |
-| 168 files, mostly moved  |   5,385 | 269 ms |       **41 ms** |        56 ms |     9 ms |   4 MB |     1,962 |
+| Synthetic                |   1,000 |  71 ms |       **36 ms** |        43 ms |     6 ms |   4 MB |     2,622 |
+| Synthetic                |  10,000 | 429 ms |       **47 ms** |        48 ms |    10 ms |   4 MB |     2,547 |
+| Synthetic                |  50,000 | 2.17 s |       **54 ms** |        67 ms |    14 ms |   7 MB |     2,403 |
+| Synthetic                | 100,000 | 4.52 s |       **64 ms** |        77 ms |    23 ms |  10 MB |     2,617 |
+| Synthetic, real edits    | 100,000 |      — |       **64 ms** |        74 ms |    23 ms |  10 MB |     2,588 |
+| Linux kernel commit      |  62,165 | 3.07 s |       **63 ms** |        70 ms |    10 ms |   8 MB |     1,865 |
+| Minified bundles, 371 KB |     128 |  52 ms |       **68 ms** |        71 ms |     5 ms |   3 MB |     1,684 |
+| 168 files, mostly moved  |   5,385 | 269 ms |       **41 ms** |        56 ms |     9 ms |   4 MB |     2,057 |
 
-At 100.000 lines that is **71× faster, 15× lighter, and 397× fewer DOM nodes** — with the
+At 100.000 lines that is **71× faster, 15× lighter, and 382× fewer DOM nodes** — with the
 syntax highlighting, the word-level marking, the folding and the grid semantics on.
 
 Read the last column first. **The DOM stops growing with the diff**: about two thousand nodes
@@ -71,11 +78,20 @@ cost stops depending on how many edits the diff contains. The second column cost
 13 ms and 1.400 nodes** — the price of two cells where there was one.
 
 Folding cost **+15 ms of first paint and 290 nodes**, the largest single regression in the
-project so far. On the kernel commit 13 ms of it happens before any DOM exists: 8.3 ms to work
+project so far. On the kernel commit 7 ms of it happens before any DOM exists: 2.3 ms to work
 out which rows a fold leaves visible, 2.6 to seed the height store and 2.4 to hand the tree its
 heights. The rest is the wrapper element and the spoken label that every row now carries. **One
 fold itself costs 5 to 25 ms**, rising with the size of the document rather than with how much
 was hidden, because the projection is rebuilt in a single pass over every row.
+
+That first figure was 8.3 ms until the index started counting each hunk's rows as it wrote
+them, instead of the projection walking every row to count them and walking them again to
+project. Measured on its own the projection went from 7.5 ms to 2.3. **First paint did not
+move**: the saving is smaller than the spread between two runs of this benchmark, and the
+table above is unchanged because a number from one noisy run is not an improvement. The
+one column that did move is the last one — a hundred nodes in the unified layout, from
+giving the sticky line-number gutter an opaque layer of its own so a scrolling line stops
+showing through it.
 
 **First paint and memory are met at every size**, by 3.2× at 10k lines, 7.4× at 50k and 14× at
 100k — 11.7× there in the two-column layout, which is the tighter of the two. Frame rate is

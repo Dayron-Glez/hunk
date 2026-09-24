@@ -16,6 +16,7 @@ export type LoadFailure =
   | { readonly kind: 'unreadable'; readonly input: string }
   | { readonly kind: 'not-found'; readonly ref: PullRequestRef }
   | { readonly kind: 'rate-limited'; readonly resetsAt: Date | null }
+  | { readonly kind: 'bad-credentials' }
   | { readonly kind: 'too-large'; readonly ref: PullRequestRef }
   | { readonly kind: 'offline'; readonly reason: string }
   | { readonly kind: 'refused'; readonly status: number; readonly message: string }
@@ -83,18 +84,20 @@ export function apiUrlFor(ref: PullRequestRef): string {
  * `patch-diff.githubusercontent.com` — both were tried, and both fail in a
  * browser. `api.github.com` allows any origin and answers the same bytes.
  *
- * Unauthenticated, so sixty requests an hour per address. That ceiling is
- * reported rather than hidden: a reader who hits it should be told when it
- * lifts, not shown a blank page.
+ * Unauthenticated, sixty requests an hour per address, and nothing private.
+ * A token lifts both: five thousand an hour, and whatever it was scoped to
+ * read. Either ceiling is reported rather than hidden — a reader who hits one
+ * should be told when it lifts, not shown a blank page.
  */
 export async function fetchPullRequestDiff(
   ref: PullRequestRef,
   fetchImpl: typeof fetch = fetch,
+  token: string | null = null,
 ): Promise<LoadResult> {
   let response: Response
   try {
     response = await fetchImpl(apiUrlFor(ref), {
-      headers: { Accept: 'application/vnd.github.v3.diff' },
+      headers: authorized({ Accept: 'application/vnd.github.v3.diff' }, token),
     })
   } catch (error) {
     return { ok: false, failure: { kind: 'offline', reason: reasonOf(error) } }
@@ -104,6 +107,10 @@ export async function fetchPullRequestDiff(
     const diff = await response.text()
     return { ok: true, ref, diff }
   }
+
+  // Only ever the token: an anonymous request is not rejected for its
+  // credentials, it is rejected for not having any, which is a 404 or a 403.
+  if (response.status === 401) return { ok: false, failure: { kind: 'bad-credentials' } }
 
   if (response.status === 404) return { ok: false, failure: { kind: 'not-found', ref } }
 
@@ -119,6 +126,20 @@ export async function fetchPullRequestDiff(
     ok: false,
     failure: { kind: 'refused', status: response.status, message: await messageOf(response) },
   }
+}
+
+/**
+ * The token, where there is one.
+ *
+ * `api.github.com` answers a preflight for this header, which is why the
+ * blobs a private diff needs come from here too rather than from
+ * `raw.githubusercontent.com` — raw rejects the preflight outright.
+ */
+export function authorized(
+  headers: Record<string, string>,
+  token: string | null,
+): Record<string, string> {
+  return token === null || token === '' ? headers : { ...headers, Authorization: `Bearer ${token}` }
 }
 
 /** 403 and 429 both mean this, and only the header tells them from a refusal. */

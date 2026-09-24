@@ -25,6 +25,11 @@ export type Column = 'old' | 'new'
 /** Stored in the typed arrays where a row has no hunk or no line of its own. */
 const ABSENT = 0xffffffff
 
+/** One number for a hunk, so the maps keyed by it need no object per lookup. */
+export function hunkKey(file: number, hunk: number): number {
+  return file * 0x10000 + hunk
+}
+
 /**
  * The diff flattened into a numbered list of rows, so "what is row 47.312?" is
  * answered without walking the file and hunk structure — a different row, on
@@ -51,6 +56,8 @@ export class RowIndex {
   private readonly fileStarts: Uint32Array
   /** Gap shown at a row, where one is. Null unless the diff can be expanded. */
   private readonly gapOfRow: (Gap | null)[] | null
+  /** Line rows each hunk holds, counted while they are written. */
+  private readonly rowsPerHunk = new Map<number, number>()
   private readonly diff: ParsedDiff
   readonly mode: LayoutMode
 
@@ -132,6 +139,11 @@ export class RowIndex {
         this.hunks[row] = hunkIndex
         row += 1
 
+        // Counted here rather than walked for later: this loop already knows
+        // which hunk it is writing, and folding needs the total on every
+        // projection it builds.
+        const firstLineRow = row
+
         if (this.newCells === null) {
           for (let lineIndex = 0; lineIndex < hunk.lines.length; lineIndex += 1) {
             this.kinds[row] = RowKind.Line
@@ -140,16 +152,19 @@ export class RowIndex {
             this.oldCells[row] = lineIndex
             row += 1
           }
-          continue
+        } else {
+          for (const cells of alignHunk(hunk.lines)) {
+            this.kinds[row] = RowKind.Line
+            this.files[row] = fileIndex
+            this.hunks[row] = hunkIndex
+            if (cells.old !== GHOST) this.oldCells[row] = cells.old
+            if (cells.new !== GHOST) this.newCells[row] = cells.new
+            row += 1
+          }
         }
 
-        for (const cells of alignHunk(hunk.lines)) {
-          this.kinds[row] = RowKind.Line
-          this.files[row] = fileIndex
-          this.hunks[row] = hunkIndex
-          if (cells.old !== GHOST) this.oldCells[row] = cells.old
-          if (cells.new !== GHOST) this.newCells[row] = cells.new
-          row += 1
+        if (row > firstLineRow) {
+          this.rowsPerHunk.set(hunkKey(fileIndex, hunkIndex), row - firstLineRow)
         }
       }
     }
@@ -161,6 +176,14 @@ export class RowIndex {
 
   get fileCount(): number {
     return this.fileStarts.length
+  }
+
+  /**
+   * Line rows each hunk holds, by `hunkKey` — in rows, not lines, because the
+   * two-column layout puts a replacement and its replaced line on one of them.
+   */
+  hunkRowCounts(): ReadonlyMap<number, number> {
+    return this.rowsPerHunk
   }
 
   kindAt(row: number): RowKind {

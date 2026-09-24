@@ -1,4 +1,4 @@
-import { RowKind, type RowIndex } from './rowIndex'
+import { RowKind, hunkKey, type RowIndex } from './rowIndex'
 
 /** Which file, and which hunk inside it. */
 export interface HunkRef {
@@ -32,10 +32,8 @@ export const EXPAND_BY = 200
  * rebuilt.
  *
  * Every instance is immutable: a toggle returns a new one. Rebuilding the
- * projection is a single pass over the rows — 4.4 ms for the kernel commit's
- * 64.807 of them, and 2.1 ms to collapse all 758 files at once, because the
- * pass writes fewer of them. Both are inside the frame the click already
- * costs.
+ * projection is a single pass over the rows — the kernel commit's 64.807 of
+ * them, well inside the frame the click already costs.
  */
 export class Folding {
   private readonly rows: RowIndex
@@ -43,7 +41,8 @@ export class Folding {
   private readonly collapsedHunks: ReadonlySet<number>
   /** Hunks the reader has opened past the default, by rows revealed. */
   private readonly revealed: ReadonlyMap<number, number>
-  /** Rows each hunk holds. Counted once per index and passed down the chain. */
+  /** Rows each hunk holds. Counted by the index as it writes them, and passed
+   *  down the chain so no projection has to walk for it. */
   private readonly hunkRows: ReadonlyMap<number, number>
   /** Visible position to row. The whole point of the class. */
   private readonly rowOf: Uint32Array
@@ -63,7 +62,7 @@ export class Folding {
     this.collapsedFiles = collapsedFiles
     this.collapsedHunks = collapsedHunks
     this.revealed = revealed
-    this.hunkRows = hunkRows ?? countHunkRows(rows)
+    this.hunkRows = hunkRows ?? rows.hunkRowCounts()
 
     const rowOf = new Uint32Array(rows.length)
     const positionOfRow = new Uint32Array(rows.length).fill(ABSENT)
@@ -75,17 +74,35 @@ export class Folding {
     let seenInHunk = 0
     let limit = 0
 
+    // Nothing folded is the common case — the first projection of every diff,
+    // and the one after every expansion. It can skip the reads below entirely.
+    const anyFolded = collapsedFiles.size > 0 || collapsedHunks.size > 0
+
     for (let row = 0; row < rows.length; row += 1) {
       const kind = rows.kindAt(row)
 
       if (kind === RowKind.HunkHeader) {
         seenInHunk = 0
-        limit = this.limitOf(keyOf({ file: rows.fileIndexAt(row), hunk: rows.hunkIndexAt(row) }))
+        limit = this.limitOf(hunkKey(rows.fileIndexAt(row), rows.hunkIndexAt(row)))
       }
 
       // Collapse first: a closed file or hunk already says so with its
       // chevron, and an expander under a header nobody opened is noise.
-      if (!visible(rows, row, collapsedFiles, collapsedHunks)) continue
+      //
+      // Written out here rather than called: this loop already holds the kind,
+      // and at 64.807 rows asking the index for it a second time is not free.
+      // A file header is always shown, so a file that is closed still has
+      // something to click.
+      if (anyFolded && kind !== RowKind.FileHeader) {
+        const file = rows.fileIndexAt(row)
+        if (collapsedFiles.has(file)) continue
+        if (
+          (kind === RowKind.Line || kind === RowKind.Gap) &&
+          collapsedHunks.has(hunkKey(file, rows.hunkIndexAt(row)))
+        ) {
+          continue
+        }
+      }
 
       if (kind === RowKind.Line) {
         seenInHunk += 1
@@ -223,7 +240,7 @@ const EMPTY_MAP: ReadonlyMap<number, number> = new Map()
 
 /** Rows are numbered, so a hunk needs one number rather than a string key. */
 function keyOf(ref: HunkRef): number {
-  return ref.file * 0x10000 + ref.hunk
+  return hunkKey(ref.file, ref.hunk)
 }
 
 function toggled(set: ReadonlySet<number>, value: number): ReadonlySet<number> {
@@ -234,40 +251,3 @@ function toggled(set: ReadonlySet<number>, value: number): ReadonlySet<number> {
 
 /** Never stored: a folded row keeps its index, it just has no position. */
 const ABSENT = 0xffffffff
-
-/**
- * How many rows each hunk holds — in rows, not lines, because the two-column
- * layout puts a replacement and its replaced line on one of them.
- *
- * Computed once per row index and handed to every projection derived from it,
- * so a toggle stays one pass rather than two.
- */
-function countHunkRows(rows: RowIndex): ReadonlyMap<number, number> {
-  const counts = new Map<number, number>()
-  for (let row = 0; row < rows.length; row += 1) {
-    if (rows.kindAt(row) !== RowKind.Line) continue
-    const key = keyOf({ file: rows.fileIndexAt(row), hunk: rows.hunkIndexAt(row) })
-    counts.set(key, (counts.get(key) ?? 0) + 1)
-  }
-  return counts
-}
-
-/**
- * A collapsed file shows its header and nothing else; a collapsed hunk shows
- * its header and none of its lines. Both leave the reader something to click,
- * which a fold that hid its own control would not.
- */
-function visible(
-  rows: RowIndex,
-  row: number,
-  collapsedFiles: ReadonlySet<number>,
-  collapsedHunks: ReadonlySet<number>,
-): boolean {
-  const kind = rows.kindAt(row)
-  if (kind === RowKind.FileHeader) return true
-
-  if (collapsedFiles.has(rows.fileIndexAt(row))) return false
-  if (kind === RowKind.Note || kind === RowKind.HunkHeader) return true
-
-  return !collapsedHunks.has(keyOf({ file: rows.fileIndexAt(row), hunk: rows.hunkIndexAt(row) }))
-}

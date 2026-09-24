@@ -11,8 +11,12 @@ import { toast } from 'sonner'
 import { acceptDiff, acceptSize, describeFileFailure } from '../core/source/file'
 import { cn } from '../lib/utils'
 import { Explain } from './Explain'
+import { TokenField } from './TokenField'
 import { describeFailure } from './loadFailure'
+import { QUIET_FOCUS } from './fields'
 import { Button } from './ui/button'
+import { Input } from './ui/input'
+import { Textarea } from './ui/textarea'
 import { TooltipProvider } from './ui/tooltip'
 
 const samples = import.meta.glob<string>('../../fixtures/github/*.diff', {
@@ -36,10 +40,15 @@ const SAMPLE_ORDER = Object.keys(SAMPLE_LABELS)
 export function SourcePicker({
   onLoad,
   openOnMount = null,
+  token = null,
+  onTokenChange,
 }: {
   readonly onLoad: (source: string, origin: DiffOrigin | null) => void
   /** A pull request the address bar already named, opened without a press. */
   readonly openOnMount?: PullRequestRef | null
+  /** The reader's GitHub token, where they have given one. */
+  readonly token?: string | null
+  readonly onTokenChange: (token: string | null) => void
 }) {
   const [pasted, setPasted] = useState('')
   const [dragging, setDragging] = useState(false)
@@ -47,11 +56,12 @@ export function SourcePicker({
   const [url, setUrl] = useState('')
   const [fetching, setFetching] = useState(false)
   const [failure, setFailure] = useState<LoadFailure | null>(null)
+  const [tokenOpen, setTokenOpen] = useState(false)
 
   const openRef = (ref: PullRequestRef): void => {
     setFailure(null)
     setFetching(true)
-    void fetchPullRequestDiff(ref).then((result) => {
+    void fetchPullRequestDiff(ref, undefined, token).then((result) => {
       setFetching(false)
       if (result.ok) {
         // Only a diff fetched from a pull request knows where the rest of its
@@ -61,7 +71,16 @@ export function SourcePicker({
           repo: ref.repo,
           ref: pullRequestRef(ref.number),
         })
-      } else setFailure(result.failure)
+      } else {
+        setFailure(result.failure)
+        // The two answers a token is the response to. Telling a reader their
+        // pull request might be private and then leaving the way to fix it
+        // behind a grey button they have no reason to notice is worse than
+        // not telling them: the instructions exist and they never see them.
+        if (result.failure.kind === 'not-found' || result.failure.kind === 'bad-credentials') {
+          setTokenOpen(true)
+        }
+      }
     })
   }
 
@@ -75,6 +94,25 @@ export function SourcePicker({
       return
     }
     openRef(ref)
+  }
+
+  /**
+   * A failure describes one request, made with whatever credentials were in
+   * hand at the time. The words it is given depend on whether there was a
+   * token — so changing the token rewrites a sentence about a request the
+   * token had nothing to do with, and a 404 from an anonymous attempt starts
+   * claiming the reader's token does not cover the repository. It does not
+   * survive the change.
+   *
+   * Dropped during the render that notices, not in an effect afterwards. An
+   * effect would let one frame through still carrying the stale sentence,
+   * and React's own rule against synchronous setState in an effect is about
+   * exactly that.
+   */
+  const [failureToken, setFailureToken] = useState(token)
+  if (failureToken !== token) {
+    setFailureToken(token)
+    setFailure(null)
   }
 
   // A link straight to a pull request opens it without a press. Once: going
@@ -151,9 +189,8 @@ export function SourcePicker({
             Paste a pull request link
           </label>
           <div className="flex gap-2">
-            <input
+            <Input
               id="pr-url"
-              type="text"
               inputMode="url"
               spellCheck={false}
               value={url}
@@ -164,9 +201,9 @@ export function SourcePicker({
               placeholder="github.com/owner/repo/pull/123"
               aria-describedby={failure === null ? 'pr-limit' : 'pr-failure'}
               aria-invalid={failure !== null}
-              className="min-w-0 flex-1 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-1.5 font-mono text-xs text-neutral-200 outline-none placeholder:text-neutral-400 focus:border-sky-500"
+              className={`flex-1 font-mono ${QUIET_FOCUS}`}
             />
-            <Button type="submit" variant="primary" disabled={url.trim() === '' || fetching}>
+            <Button type="submit" variant="default" disabled={url.trim() === '' || fetching}>
               {/* Both labels share one grid cell, so the button is always as
                   wide as the longer of them. Swapping the text instead made
                   the button grow and the field beside it shrink mid-request,
@@ -196,22 +233,38 @@ export function SourcePicker({
           {failure === null ? (
             <Explain
               side="bottom"
-              text="hunk asks GitHub for the diff from your browser. Without an account GitHub allows sixty of those an hour, and it will not hand over anything from a private repository. Dropping a .diff file needs neither."
+              text={
+                token === null
+                  ? 'hunk asks GitHub for the diff from your browser. Without an account GitHub allows sixty of those an hour, and it will not hand over anything from a private repository. A token lifts both; dropping a .diff file needs neither.'
+                  : 'hunk asks GitHub for the diff from your browser, with your token. That allows five thousand requests an hour and reaches whatever the token was scoped to read.'
+              }
             >
               <p
                 id="pr-limit"
                 className="w-fit cursor-help text-xs text-neutral-400 underline decoration-dotted underline-offset-4"
               >
-                Public repositories only, through GitHub&rsquo;s API — sixty requests an hour
-                without an account.
+                {token === null
+                  ? 'Public repositories only, through GitHub’s API — sixty requests an hour without an account.'
+                  : 'Through GitHub’s API, with your token — five thousand requests an hour.'}
               </p>
             </Explain>
           ) : (
             <p id="pr-failure" role="alert" className="text-xs text-amber-200/90">
-              {describeFailure(failure)}
+              {describeFailure(failure, { hasToken: token !== null })}
             </p>
           )}
         </form>
+
+        {/* A sibling of the pull request form, not a child of it. It has a
+            form of its own so Enter submits the token rather than the link,
+            and a form inside a form is not a thing HTML has: React refuses
+            it, the handler never runs, and the press reloads the page. */}
+        <TokenField
+          token={token}
+          onChange={onTokenChange}
+          open={tokenOpen}
+          onOpenChange={setTokenOpen}
+        />
 
         {/*
           A label rather than a div: dropping a file was the only way in, and
@@ -219,6 +272,12 @@ export function SourcePicker({
           there is no dragging at all — had nothing to press. The input it
           wraps is the control; `focus-within` is what shows the ring, since
           the input itself is out of sight.
+
+          The ring is the one the components draw — `border-ring` with
+          `ring-ring/50` at three pixels — because this is a control like any
+          other, and a hand-rolled focus style is a second thing to keep in
+          step with the theme. It was a `sky-400` outline written right here,
+          and it drifted the moment the accent moved.
         */}
         <label
           htmlFor="diff-file"
@@ -232,11 +291,11 @@ export function SourcePicker({
           onDrop={handleDrop}
           className={cn(
             'flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-dashed p-8',
-            'text-center text-sm transition-colors focus-within:border-sky-400',
-            'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-sky-400',
+            'text-center text-sm transition-colors outline-none',
+            'focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-3',
             dragging
-              ? 'border-sky-400 bg-sky-500/10 text-sky-200'
-              : 'border-neutral-700 text-neutral-400 hover:border-neutral-500 hover:text-neutral-300',
+              ? 'border-primary bg-primary/10 text-foreground'
+              : 'border-input text-muted-foreground hover:border-ring hover:text-foreground',
           )}
         >
           <input
@@ -262,7 +321,7 @@ export function SourcePicker({
           <label htmlFor="paste" className="text-sm text-neutral-400">
             …or paste a diff
           </label>
-          <textarea
+          <Textarea
             id="paste"
             value={pasted}
             onChange={(event) => {
@@ -270,19 +329,19 @@ export function SourcePicker({
             }}
             rows={6}
             spellCheck={false}
-            className="w-full resize-y rounded-lg border border-neutral-800 bg-neutral-900 p-3 font-mono text-xs text-neutral-200 outline-none placeholder:text-neutral-400 focus:border-sky-500"
+            className={`resize-y font-mono ${QUIET_FOCUS}`}
             placeholder="diff --git a/… b/…"
           />
-          <button
-            type="button"
+          <Button
+            variant="default"
+            className="self-start"
             disabled={pasted.trim() === ''}
             onClick={() => {
               onLoad(pasted, null)
             }}
-            className="self-start rounded-md bg-sky-700 px-3 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
             Render it
-          </button>
+          </Button>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -290,17 +349,17 @@ export function SourcePicker({
           <ul className="flex flex-col gap-1">
             {SAMPLE_ORDER.map((name) => (
               <li key={name}>
-                <button
-                  type="button"
+                <Button
+                  variant="outline"
                   disabled={busy !== null}
                   onClick={() => {
                     loadSample(name)
                   }}
-                  className="w-full rounded-md border border-neutral-800 px-3 py-2 text-left text-sm text-neutral-300 hover:border-neutral-600 hover:bg-neutral-900 disabled:opacity-40"
+                  className="w-full justify-start font-normal"
                 >
                   {SAMPLE_LABELS[name]}
                   {busy === name ? <span className="text-neutral-400"> — loading…</span> : null}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

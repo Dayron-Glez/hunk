@@ -197,3 +197,60 @@ describe('saying what went wrong', () => {
     }
   })
 })
+
+/**
+ * The header only the API will take. `raw.githubusercontent.com` rejects the
+ * preflight it triggers, which is why an authenticated reader's file contents
+ * come from here too — measured in a browser, not assumed.
+ */
+describe('with a token', () => {
+  const spying = (): { fetch: typeof fetch; inits: RequestInit[] } => {
+    const inits: RequestInit[] = []
+    return {
+      inits,
+      fetch: ((_url: string, init: RequestInit) => {
+        inits.push(init)
+        return Promise.resolve(
+          new Response('diff --git a/x b/x' + String.fromCharCode(10), { status: 200 }),
+        )
+      }) as unknown as typeof fetch,
+    }
+  }
+
+  const headersOf = (init: RequestInit | undefined): Record<string, string> =>
+    (init?.headers ?? {}) as Record<string, string>
+
+  it('sends it as a bearer, beside the diff media type', async () => {
+    const spy = spying()
+    await fetchPullRequestDiff(VITE, spy.fetch, 'github_pat_abc')
+    expect(headersOf(spy.inits[0])).toEqual({
+      Accept: 'application/vnd.github.v3.diff',
+      Authorization: 'Bearer github_pat_abc',
+    })
+  })
+
+  it('sends no such header without one', async () => {
+    const spy = spying()
+    await fetchPullRequestDiff(VITE, spy.fetch)
+    expect(headersOf(spy.inits[0])).toEqual({ Accept: 'application/vnd.github.v3.diff' })
+  })
+
+  it('sends none for an empty one, rather than an empty bearer', async () => {
+    const spy = spying()
+    await fetchPullRequestDiff(VITE, spy.fetch, '')
+    expect(headersOf(spy.inits[0])).not.toHaveProperty('Authorization')
+  })
+
+  /** Its own failure, not a generic refusal: a token that expired between
+   *  loading the picker and pressing the button needs replacing, and saying
+   *  "GitHub refused the request: Bad credentials (HTTP 401)" does not say
+   *  which of the reader's problems this is. */
+  it('names a rejected token rather than calling it a refusal', async () => {
+    const result = await fetchPullRequestDiff(
+      VITE,
+      reply(401, '{"message":"Bad credentials"}'),
+      'stale',
+    )
+    expect(result).toEqual({ ok: false, failure: { kind: 'bad-credentials' } })
+  })
+})

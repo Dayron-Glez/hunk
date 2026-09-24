@@ -3,11 +3,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { DiffView } from './components/DiffView'
 import { SourcePicker } from './components/SourcePicker'
 import { Button } from './components/ui/button'
+import { TOAST_DURATION_MS } from './components/toasts'
 import { Toaster } from './components/ui/sonner'
 import { useExpansion } from './components/useExpansion'
 import type { DiffOrigin } from './core/expand/blobs'
 import type { PullRequestRef } from './core/source/github'
 import { pathOf, routeOf } from './core/source/route'
+import { readToken } from './core/source/token'
 import { parseUnifiedDiff } from './core/parse/unified'
 import type { ParsedDiff } from './core/parse/types'
 
@@ -16,6 +18,18 @@ interface Loaded {
   /** Where its files can be fetched, or null for a diff that was pasted. */
   readonly origin: DiffOrigin | null
 }
+
+/**
+ * What this application asks of the Toaster. Its own file is shadcn's and
+ * says nothing about this viewer; these are the choices that do.
+ */
+const TOASTS = {
+  theme: 'dark',
+  richColors: true,
+  closeButton: true,
+  position: 'bottom-right',
+  duration: TOAST_DURATION_MS,
+} as const
 
 /** Where this build is served from, which is not always the root. */
 const BASE = import.meta.env.BASE_URL
@@ -33,6 +47,15 @@ export function App() {
    * whatever followed it.
    */
   const [wanted, setWanted] = useState<PullRequestRef | null>(() => refOf(location.pathname))
+
+  /**
+   * The reader's GitHub token, read once at startup.
+   *
+   * Held here rather than read where it is used, so that forgetting it takes
+   * effect immediately: both the diff request and the files fetched to fill
+   * its gaps have to agree about whether there is one.
+   */
+  const [token, setToken] = useState<string | null>(() => readToken())
 
   useEffect(() => {
     const onPop = (): void => {
@@ -64,14 +87,22 @@ export function App() {
     setLoaded((current) => (current === null ? null : { ...current, diff }))
   }, [])
 
-  const expansion = useExpansion(loaded?.origin ?? null, loaded?.diff ?? null, onExpanded)
+  const expansion = useExpansion(
+    loaded?.origin ?? null,
+    loaded?.diff ?? null,
+    onExpanded,
+    undefined,
+    token,
+  )
 
   if (loaded === null) {
     return (
       <main className="min-h-full bg-neutral-950 text-neutral-100">
-        <Toaster />
+        <Toaster {...TOASTS} />
         <SourcePicker
           openOnMount={wanted}
+          token={token}
+          onTokenChange={setToken}
           onLoad={(source, origin) => {
             const ref = refOfOrigin(origin)
             if (ref !== null) rememberPullRequest(ref)
@@ -87,11 +118,11 @@ export function App() {
 
   return (
     <main className="flex h-full flex-col bg-neutral-950 text-neutral-100">
-      <Toaster />
+      <Toaster {...TOASTS} />
       <div className="flex shrink-0 items-center gap-2 border-b border-neutral-800 px-4 py-2">
         <FileDiff aria-hidden className="size-4 text-sky-500" />
         <h1 className="font-mono text-sm font-semibold">hunk</h1>
-        <Button size="sm" className="ml-auto" onClick={() => history.back()}>
+        <Button variant="outline" size="sm" className="ml-auto" onClick={() => history.back()}>
           <ArrowLeft aria-hidden className="size-3.5" />
           Load another
         </Button>
