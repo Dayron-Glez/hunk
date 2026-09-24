@@ -40,9 +40,10 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
-    // The benchmark runner is a Node script that also carries callbacks which
-    // Playwright evaluates inside the page, so both sets of globals are real here.
-    files: ['bench/**/*.mjs'],
+    // The benchmark runner and the contrast audit are Node scripts that also
+    // carry callbacks which Playwright evaluates inside the page, so both
+    // sets of globals are real here.
+    files: ['bench/**/*.mjs', 'audit/**/*.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {

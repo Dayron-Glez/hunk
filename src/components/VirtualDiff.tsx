@@ -480,6 +480,26 @@ export function VirtualDiff({
       {/* Sized for the whole document, so the reader can scroll to rows that
           are not in the DOM yet. */}
       <div role="presentation" style={{ height: shown.totalHeight }} className="relative">
+        {/*
+          The rule between the two columns, drawn once for the whole document.
+
+          It was a `border-r` on every left-hand cell, which is one segment
+          per row of a line that is one device pixel wide — and rows have
+          fractional heights, so the segments landed on different subpixels
+          and the join between them showed. What a reader saw was the border
+          of each row rather than one rule down the view. Nothing measures it
+          and nothing reads it, so it can sit outside the rows entirely.
+        */}
+        {mode === 'split' ? (
+          <div
+            aria-hidden
+            // Above the rows: the block they sit in is transformed, which
+            // makes it a stacking context, and without a z-index of its own
+            // the rule paints under every tinted cell and shows only where a
+            // line is unchanged.
+            className="pointer-events-none absolute inset-y-0 left-1/2 z-20 w-px bg-neutral-800"
+          />
+        ) : null}
         {/* One transform for the block: rows stay in normal flow, which is
             what lets them be measured. */}
         <div

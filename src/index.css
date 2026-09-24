@@ -10,6 +10,31 @@
 @theme {
   --font-mono:
     ui-monospace, 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', monospace;
+
+  /*
+    The diff's own six colours: a tint for the row, a stronger one for the
+    words that changed inside it, and an ink for the marker, the edge and the
+    counts. Here rather than spread through DiffRow and rows as Tailwind
+    literals, because they answer to one another and to a measurement.
+
+    The tints are as light as 4.5:1 allows and no lighter. Text sits on them
+    — line numbers at neutral-400, and highlighted code as dark as the reds
+    Shiki uses for keywords — so every step up in background is a step down
+    in the contrast of the code a reader came to read. `npm run audit:contrast`
+    is what says where that line is; the pairs below sit just under it.
+
+    Added and removed are matched in luminance on purpose. They were not:
+    rose at a tenth of an alpha came out at 1.07 against the page while
+    emerald reached 1.12, so a removal read as an unmarked line. Weight now
+    comes from the edge and the marker, which are free of text and can be
+    loud, and the tint only has to agree with them.
+  */
+  --color-diff-added: oklch(0.249 0.045 155);
+  --color-diff-added-mark: oklch(0.316 0.07 155);
+  --color-diff-added-ink: oklch(0.651 0.16 155);
+  --color-diff-removed: oklch(0.262 0.06 22);
+  --color-diff-removed-mark: oklch(0.335 0.09 22);
+  --color-diff-removed-ink: oklch(0.69 0.17 22);
 }
 
 @theme inline {
@@ -126,7 +151,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;

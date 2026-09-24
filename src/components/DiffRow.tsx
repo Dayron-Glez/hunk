@@ -4,8 +4,24 @@ import type { DiffLine } from '../core/parse/types'
 
 const ROW_STYLES: Record<DiffLine['kind'], string> = {
   context: 'bg-transparent',
-  insert: 'bg-emerald-500/10',
-  delete: 'bg-rose-500/10',
+  insert: 'bg-diff-added',
+  delete: 'bg-diff-removed',
+}
+
+/**
+ * The bar down the left of a changed line.
+ *
+ * The tint cannot be made loud enough to carry this on its own: code sits on
+ * it, and every step up in the background costs the code contrast it cannot
+ * spare. The bar carries no text, so it can be the full ink — six times the
+ * page rather than one and a quarter — and it is what a reader actually sees
+ * when they glance down a file. A border on an element that already exists,
+ * not another one: the row count is the whole point of this viewer.
+ */
+const EDGE_STYLES: Record<DiffLine['kind'], string> = {
+  context: 'border-l-4 border-l-transparent',
+  insert: 'border-l-4 border-l-diff-added-ink',
+  delete: 'border-l-4 border-l-diff-removed-ink',
 }
 
 const MARKERS: Record<DiffLine['kind'], string> = {
@@ -16,8 +32,8 @@ const MARKERS: Record<DiffLine['kind'], string> = {
 
 const MARKER_STYLES: Record<DiffLine['kind'], string> = {
   context: 'text-neutral-600',
-  insert: 'text-emerald-400',
-  delete: 'text-rose-400',
+  insert: 'text-diff-added-ink',
+  delete: 'text-diff-removed-ink',
 }
 
 /**
@@ -34,10 +50,24 @@ function spokenLabel(line: DiffLine, number: number | null): string {
   return `Line${where}.`
 }
 
+/**
+ * The words that changed inside a changed line.
+ *
+ * It used to be a second tint laid over the row's: `emerald-400/25` on top of
+ * `emerald-500/10`, two shades of the same family stacking into a third
+ * nobody chose. One background now, and the difference it can make is small
+ * — the mark is only 1.26 times the row it sits in, because anything louder
+ * takes the code below 4.5:1.
+ *
+ * An underline in the edge's ink was tried to make up that difference and
+ * taken out again: inside code a horizontal rule under a run of characters
+ * reads as a strikethrough or a spell-check squiggle, and the reader has to
+ * work out it means neither. The box is quieter and says the right thing.
+ */
 const CHANGED_STYLES: Record<DiffLine['kind'], string> = {
   context: '',
-  insert: 'bg-emerald-400/25 rounded-[2px]',
-  delete: 'bg-rose-400/25 rounded-[2px]',
+  insert: 'bg-diff-added-mark rounded-[2px]',
+  delete: 'bg-diff-removed-mark rounded-[2px]',
 }
 
 export function DiffRow({
@@ -70,7 +100,7 @@ export function DiffRow({
         its colour.
       */}
       <div className="sticky left-0 z-10 flex bg-neutral-950" aria-hidden>
-        <div className={`flex select-none ${ROW_STYLES[line.kind]}`}>
+        <div className={`flex select-none ${EDGE_STYLES[line.kind]} ${ROW_STYLES[line.kind]}`}>
           <span className="w-12 shrink-0 pr-2 text-right text-neutral-400 tabular-nums">
             {line.oldNumber}
           </span>
@@ -138,11 +168,12 @@ function SplitCell({
   readonly segments: readonly Segment[] | null
   readonly column: 'old' | 'new'
 }) {
-  const edge = column === 'old' ? 'border-r border-neutral-800' : ''
-
   if (line === null) {
     return (
-      <div role="gridcell" className={`w-1/2 shrink-0 bg-neutral-900/40 ${edge}`}>
+      <div
+        role="gridcell"
+        className="w-1/2 shrink-0 border-l-4 border-l-transparent bg-neutral-900/40"
+      >
         <span className="sr-only select-none">
           {column === 'old' ? 'No line here before.' : 'No line here after.'}
         </span>
@@ -151,7 +182,10 @@ function SplitCell({
   }
 
   return (
-    <div role="gridcell" className={`flex w-1/2 shrink-0 ${ROW_STYLES[line.kind]} ${edge}`}>
+    <div
+      role="gridcell"
+      className={`flex w-1/2 shrink-0 ${EDGE_STYLES[line.kind]} ${ROW_STYLES[line.kind]}`}
+    >
       <span className="sr-only select-none">
         {spokenLabel(line, column === 'old' ? line.oldNumber : line.newNumber)}
       </span>

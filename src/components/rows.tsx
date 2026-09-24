@@ -30,7 +30,14 @@ export function FileHeaderRow({
   return (
     <div
       role="gridcell"
-      className="flex w-max min-w-full flex-wrap items-center gap-x-3 gap-y-1 border-t border-neutral-800 bg-neutral-900 px-3 py-2"
+      /* Where one file ends is a question a reader asks eight hundred times
+         down a kernel commit, and a single hairline shared with every other
+         border in the view did not answer it. A heavier rule above, a lighter
+         one below to close the header off, and padding rather than margin for
+         the air: the virtualizer measures with getBoundingClientRect, which
+         does not count margins, so a margin here would put every row below
+         this one out by its height. */
+      className="flex w-max min-w-full flex-wrap items-center gap-x-3 gap-y-1 border-t-2 border-b border-t-neutral-600 border-b-neutral-800 bg-neutral-900 px-3 pt-4 pb-3"
     >
       <Chevron collapsed={collapsed} onToggle={onToggle} label={describePath(file)} />
       <span
@@ -47,8 +54,8 @@ export function FileHeaderRow({
         <span className="font-mono text-xs text-neutral-500">{describeMode(file)}</span>
       ) : null}
       <span className="ml-auto pl-6 font-mono text-xs">
-        <span className="text-emerald-400">+{file.additions}</span>{' '}
-        <span className="text-rose-400">-{file.deletions}</span>
+        <span className="text-diff-added-ink">+{file.additions}</span>{' '}
+        <span className="text-diff-removed-ink">-{file.deletions}</span>
       </span>
     </div>
   )

@@ -123,11 +123,16 @@ Each line says what it is — "Added line 595." — because the gutter it replac
 numbers and a punctuation mark read aloud. Those labels carry `select-none`, so copying a block
 of the diff still yields code and not code plus commentary.
 
-**Contrast is measured, not assumed.** Every text node on both screens and in both layouts is
-checked against the background it actually composites onto, with the WCAG AA threshold for its
-size: 484 elements in one column, 740 in two, and nothing under 4.5:1. That audit is what found
-the line numbers at **2.53:1** — `neutral-500` would not have fixed it either, at 3.54:1
-against a removed line.
+**Contrast is measured, not assumed.** `npm run audit:contrast` builds the viewer, walks the
+picker and both layouts in a real browser, and composites every text node against the
+background it actually sits on — which is rarely the page, since a changed row is a tint and a
+changed word is a stronger one on top of it. 1.236 text nodes and focus rings on the last run,
+nothing under 4.5:1, the narrowest text margin **5.25:1**.
+
+That audit is what found the line numbers at **2.53:1** — `neutral-500` would not have fixed it
+either, at 3.54:1 against a removed line. It is also what sets the diff palette: the row tints
+in `src/index.css` are as light as the code sitting on them allows and no lighter, which is why
+a changed line is marked by the bar down its left rather than by its background.
 
 Almost nothing moves. One colour transition on the drop zone, and one spinner while a pull
 request is being fetched — that one is behind `motion-safe`, so a reader who asks for less
@@ -170,6 +175,11 @@ Two of the cases that break parsers could not be found at all. Scanning hundreds
 across git, Linux, npm, Vite, prettier, Babel, TypeScript, esbuild and VS Code turned up not one
 `\ No newline at end of file` and not one file mode change. Rare in practice, still fatal, so
 they are produced by a script driving real git — byte-identical on every run.
+
+The picker offers eight of them as samples, and none of them is in the bundle a visitor
+downloads. `import.meta.glob` without `eager` compiles to a map of dynamic imports, so each
+sample is its own chunk and is fetched on the press: the entry is **383.560 bytes**, and the
+kernel commit's **2.123.252** sit beside it, reached only if someone asks for them.
 
 Of the 537 tests, 193 are invariants applied across the whole corpus, which means they
 already cover fixtures nobody has added yet. `fixtures/README.md` has the full list and what

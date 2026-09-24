@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { DiffLine } from '../core/parse/types'
-import { DiffRow } from './DiffRow'
+import { DiffRow, SplitDiffRow } from './DiffRow'
 
 const lineOf = (kind: DiffLine['kind']): DiffLine => ({
   kind,
@@ -66,14 +66,62 @@ describe('the line-number gutter', () => {
     expect(tinted).not.toBeNull()
     const expected = {
       context: 'bg-transparent',
-      insert: 'bg-emerald-500/10',
-      delete: 'bg-rose-500/10',
+      insert: 'bg-diff-added',
+      delete: 'bg-diff-removed',
     }[kind]
     expect(backgroundsOn(tinted!)).toEqual([expected])
+  })
+
+  /** The bar is the loud part of a changed line — the tint is held down by
+   *  the code that has to stay readable on it — so it belongs where the
+   *  numbers are, which is the one place that survives a long line being
+   *  scrolled sideways. */
+  it.each(KINDS)('carries the edge bar on the sticky side, for a %s line', (kind) => {
+    const { container } = render(<DiffRow line={lineOf(kind)} segments={null} />)
+    const tinted = gutterOf(container).firstElementChild
+    expect(tinted).not.toBeNull()
+    const expected = {
+      context: 'border-l-transparent',
+      insert: 'border-l-diff-added-ink',
+      delete: 'border-l-diff-removed-ink',
+    }[kind]
+    expect(String(tinted!.className).split(' ')).toContain(expected)
   })
 
   it('keeps the numbers out of a copied selection', () => {
     const { container } = render(<DiffRow line={lineOf('context')} segments={null} />)
     expect(gutterOf(container).querySelector('.select-none')).not.toBeNull()
+  })
+})
+
+/**
+ * The edge bar names its side. The divider between the columns used to be a
+ * `border-neutral-800` on the same element, and the shorthand writes every
+ * side: it repainted the bar, and which of the two won came down to the order
+ * Tailwind emitted them in — the removal's bar went grey on the left while
+ * the addition's stayed green on the right, where there was no divider. The
+ * divider has since moved out of the rows altogether, but the rule it broke
+ * is the one that matters here, and it is the same rule as one background per
+ * element.
+ */
+describe('the split row', () => {
+  const removal: DiffLine = { ...lineOf('delete') }
+  const addition: DiffLine = { ...lineOf('insert') }
+
+  it('keeps the edge bar on both columns, in their own colours', () => {
+    const { container } = render(
+      <SplitDiffRow oldLine={removal} newLine={addition} oldSegments={null} newSegments={null} />,
+    )
+    const [before, after] = container.querySelectorAll('[role="gridcell"]')
+    const classesOf = (element: Element): string[] => String(element.className).split(' ')
+
+    expect(classesOf(before!)).toContain('border-l-diff-removed-ink')
+    expect(classesOf(after!)).toContain('border-l-diff-added-ink')
+    // Nothing on a cell may write border-color for every side at once.
+    for (const cell of [before!, after!]) {
+      expect(
+        classesOf(cell).filter((name) => /^border-(?!l-|r-|t-|b-|x-|y-)\S*[a-z]/.test(name)),
+      ).toEqual([])
+    }
   })
 })

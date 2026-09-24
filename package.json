@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
-    "bench": "node bench/run.mjs"
+    "bench": "node bench/run.mjs",
+    "audit:contrast": "node audit/contrast.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
