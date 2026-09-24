@@ -1,50 +1,52 @@
-import * as TooltipPrimitive from '@radix-ui/react-tooltip'
-import type { ComponentProps } from 'react'
-import { cn } from '../../lib/utils'
+'use client'
 
-/**
- * A tooltip, from Radix by way of shadcn.
- *
- * Used on the chrome and nowhere else. Inside the diff a tooltip per control
- * would mean one of these mounting and unmounting for every row that scrolls
- * past — about 180 at a time on a full screen — which is the kind of cost
- * this viewer exists to not have. The rows share a single one instead.
- */
-export function TooltipProvider({
-  delayDuration = 300,
+import * as React from 'react'
+import { cn } from 'cn'
+import { Tooltip as TooltipPrimitive } from 'radix-ui'
+
+function TooltipProvider({
+  delayDuration = 0,
   ...props
-}: ComponentProps<typeof TooltipPrimitive.Provider>) {
-  return <TooltipPrimitive.Provider delayDuration={delayDuration} {...props} />
+}: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
+  return (
+    <TooltipPrimitive.Provider
+      data-slot="tooltip-provider"
+      delayDuration={delayDuration}
+      {...props}
+    />
+  )
 }
 
-export function Tooltip(props: ComponentProps<typeof TooltipPrimitive.Root>) {
-  return <TooltipPrimitive.Root {...props} />
+function Tooltip({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
+  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
 }
 
-export function TooltipTrigger(props: ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return <TooltipPrimitive.Trigger {...props} />
+function TooltipTrigger({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
+  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
 }
 
-export function TooltipContent({
+function TooltipContent({
   className,
-  sideOffset = 6,
+  sideOffset = 0,
   children,
   ...props
-}: ComponentProps<typeof TooltipPrimitive.Content>) {
+}: React.ComponentProps<typeof TooltipPrimitive.Content>) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
+        data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          'z-50 max-w-xs rounded-md border border-neutral-700 bg-neutral-900 px-2.5 py-1.5',
-          'text-xs text-neutral-100 shadow-lg',
+          'bg-foreground text-background data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 z-50 inline-flex w-fit max-w-xs origin-(--radix-tooltip-content-transform-origin) items-center gap-1.5 rounded-md px-3 py-1.5 text-xs has-data-[slot=kbd]:pr-1.5 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm',
           className,
         )}
         {...props}
       >
         {children}
-        <TooltipPrimitive.Arrow className="fill-neutral-700" />
+        <TooltipPrimitive.Arrow className="bg-foreground fill-foreground z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   )
 }
+
+export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger }

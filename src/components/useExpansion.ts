@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { BlobStore, type DiffOrigin } from '../core/expand/blobs'
+import { BlobStore, describeBlobFailure, type DiffOrigin } from '../core/expand/blobs'
 import { expandInDiff, fileMatchesDiff, type Direction, type Gap } from '../core/expand/gaps'
 import type { ParsedDiff } from '../core/parse/types'
 import type { Expansion } from './VirtualDiff'
@@ -20,10 +20,11 @@ export function useExpansion(
   diff: ParsedDiff | null,
   onExpanded: (diff: ParsedDiff) => void,
   fetchImpl?: typeof fetch,
+  token: string | null = null,
 ): Expansion | null {
   const store = useMemo(
-    () => (origin === null ? null : new BlobStore(origin, fetchImpl)),
-    [origin, fetchImpl],
+    () => (origin === null ? null : new BlobStore(origin, fetchImpl, token)),
+    [origin, fetchImpl, token],
   )
   const [states, setStates] = useState<ReadonlyMap<string, GapState>>(new Map())
 
@@ -46,7 +47,7 @@ export function useExpansion(
       void store.linesOf(path).then((result) => {
         if (!result.ok) {
           setStates((current) =>
-            replace(current, key, { error: `Could not fetch it: ${result.reason}.` }),
+            replace(current, key, { error: describeBlobFailure(result.failure) }),
           )
           return
         }

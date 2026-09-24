@@ -60,7 +60,15 @@ export function acceptSize(name: string, bytes: number): FileFailure | null {
   return bytes > MAX_FILE_BYTES ? { kind: 'too-large', name, bytes } : null
 }
 
-/** What to put in front of the reader, in that failure's own words. */
+/**
+ * What to put in front of the reader, in that failure's own words.
+ *
+ * Three sentences on purpose, and longer than a toast is given: they run to
+ * fifteen and twenty words against the five seconds set in
+ * `components/ui/sonner`, which affords about twelve. These are the messages
+ * that lean on the close button rather than on the clock. Cutting them to
+ * fit would trade the reason a reader can act on for a deadline nobody set.
+ */
 export function describeFileFailure(failure: FileFailure): string {
   switch (failure.kind) {
     case 'too-large':

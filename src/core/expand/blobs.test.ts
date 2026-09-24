@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { BlobStore, pullRequestRef, splitLines, type DiffOrigin } from './blobs'
+import {
+  BlobStore,
+  describeBlobFailure,
+  pullRequestRef,
+  splitLines,
+  type BlobFailure,
+  type DiffOrigin,
+} from './blobs'
 
 const ORIGIN: DiffOrigin = { owner: 'vitejs', repo: 'vite', ref: 'refs/pull/23346/head' }
 
@@ -103,7 +110,7 @@ describe('when it cannot be fetched', () => {
     const result = await store.linesOf('gone.ts')
     expect(result).toEqual({
       ok: false,
-      reason: 'that file is not in the commit this diff came from',
+      failure: { kind: 'not-in-commit', path: 'gone.ts' },
     })
   })
 
@@ -111,14 +118,17 @@ describe('when it cannot be fetched', () => {
     const store = new BlobStore(ORIGIN, serving('', 503).fetch)
     const result = await store.linesOf('a.ts')
     expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.reason).toContain('503')
+    if (!result.ok) expect(result.failure).toEqual({ kind: 'refused', status: 503 })
   })
 
   it('reports a request that never arrived', async () => {
     const dead = (() => Promise.reject(new TypeError('Failed to fetch'))) as unknown as typeof fetch
     const store = new BlobStore(ORIGIN, dead)
     const result = await store.linesOf('a.ts')
-    expect(result).toEqual({ ok: false, reason: 'Failed to fetch' })
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'offline', reason: 'Failed to fetch' },
+    })
   })
 
   it('does not ask again after a failure it already reported', async () => {
@@ -204,5 +214,123 @@ describe('the default', () => {
     void store.linesOf('a.ts')
     expect(spy).toHaveBeenCalledOnce()
     vi.unstubAllGlobals()
+  })
+})
+
+/**
+ * Two routes, and the token decides. Both were measured in a browser: raw is
+ * free but cannot be authenticated, since the header turns the request into a
+ * preflight raw rejects outright. The API answers that preflight and costs
+ * one of the hourly limit, which a token raises from sixty to five thousand.
+ */
+describe('with a token', () => {
+  const TOKEN = 'github_pat_abc'
+
+  const spying = (
+    body = 'one',
+    status = 200,
+  ): { fetch: typeof fetch; urls: string[]; inits: (RequestInit | undefined)[] } => {
+    const urls: string[] = []
+    const inits: (RequestInit | undefined)[] = []
+    return {
+      urls,
+      inits,
+      fetch: ((url: string, init?: RequestInit) => {
+        urls.push(String(url))
+        inits.push(init)
+        return Promise.resolve(new Response(body, { status }))
+      }) as unknown as typeof fetch,
+    }
+  }
+
+  it('asks the API instead of raw, with the ref as a parameter', () => {
+    const store = new BlobStore(ORIGIN, serving('').fetch, TOKEN)
+    expect(store.urlFor('src/a.ts')).toBe(
+      'https://api.github.com/repos/vitejs/vite/contents/src/a.ts?ref=refs%2Fpull%2F23346%2Fhead',
+    )
+  })
+
+  it('still asks raw without one', () => {
+    const store = new BlobStore(ORIGIN, serving('').fetch)
+    expect(store.urlFor('src/a.ts')).toContain('raw.githubusercontent.com')
+  })
+
+  it('treats an empty token as none, rather than sending an empty bearer', async () => {
+    const spy = spying()
+    const store = new BlobStore(ORIGIN, spy.fetch, '')
+    await store.linesOf('a.ts')
+    expect(spy.urls[0]).toContain('raw.githubusercontent.com')
+    expect(spy.inits[0]).toBeUndefined()
+  })
+
+  it('sends the bearer and the raw media type to the API', async () => {
+    const spy = spying()
+    const store = new BlobStore(ORIGIN, spy.fetch, TOKEN)
+    await store.linesOf('a.ts')
+    expect(spy.inits[0]?.headers).toEqual({
+      Accept: 'application/vnd.github.raw',
+      Authorization: `Bearer ${TOKEN}`,
+    })
+  })
+
+  /** Anything raw does not need is a preflight it would fail, so the
+   *  unauthenticated route sends no init object at all. */
+  it('sends no headers at all on the raw route', async () => {
+    const spy = spying()
+    const store = new BlobStore(ORIGIN, spy.fetch)
+    await store.linesOf('a.ts')
+    expect(spy.inits[0]).toBeUndefined()
+  })
+
+  it('returns the same lines whichever route fetched them', async () => {
+    const body = ['one', 'two'].join(String.fromCharCode(10))
+    const viaRaw = await new BlobStore(ORIGIN, serving(body).fetch).linesOf('a.ts')
+    const viaApi = await new BlobStore(ORIGIN, serving(body).fetch, TOKEN).linesOf('a.ts')
+    expect(viaApi).toEqual(viaRaw)
+  })
+
+  it('names a token the API rejected', async () => {
+    const store = new BlobStore(ORIGIN, serving('', 401).fetch, TOKEN)
+    expect(await store.linesOf('a.ts')).toEqual({
+      ok: false,
+      failure: { kind: 'bad-credentials' },
+    })
+  })
+
+  /** The API route spends the hourly limit, which raw never did. */
+  it('tells a spent limit from a plain refusal', async () => {
+    const limited = ((_url: string) =>
+      Promise.resolve(
+        new Response('', { status: 403, headers: { 'x-ratelimit-remaining': '0' } }),
+      )) as unknown as typeof fetch
+    expect(await new BlobStore(ORIGIN, limited, TOKEN).linesOf('a.ts')).toEqual({
+      ok: false,
+      failure: { kind: 'rate-limited' },
+    })
+
+    const forbidden = ((_url: string) =>
+      Promise.resolve(new Response('', { status: 403 }))) as unknown as typeof fetch
+    expect(await new BlobStore(ORIGIN, forbidden, TOKEN).linesOf('a.ts')).toEqual({
+      ok: false,
+      failure: { kind: 'refused', status: 403 },
+    })
+  })
+})
+
+describe('what the reader is told about a file', () => {
+  it('has a sentence for every failure, and names the file where it can', () => {
+    const all: BlobFailure[] = [
+      { kind: 'not-in-commit', path: 'src/a.ts' },
+      { kind: 'bad-credentials' },
+      { kind: 'rate-limited' },
+      { kind: 'offline', reason: 'Failed to fetch' },
+      { kind: 'refused', status: 503 },
+    ]
+    for (const failure of all) {
+      const said = describeBlobFailure(failure)
+      expect(said.length).toBeGreaterThan(20)
+      expect(said).not.toContain('undefined')
+    }
+    expect(describeBlobFailure({ kind: 'not-in-commit', path: 'src/a.ts' })).toContain('src/a.ts')
   })
 })
