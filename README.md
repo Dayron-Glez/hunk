@@ -3,10 +3,11 @@
 A diff viewer for the files that bring the others down. Paste a GitHub pull request URL, drop
 two files or a `.patch`, and read it.
 
-> **Status: F4 complete — every target is met, with room to spare.**
+> **Status: F5 complete — every target is met, with room to spare.**
 > Variable-height virtualization, syntax highlighting that arrives from a worker without
-> touching first paint, the change inside a line marked word by word in one column or two, and
-> the whole thing foldable and readable from the keyboard. The numbers below are measured and
+> touching first paint, the change inside a line marked word by word in one column or two, the
+> whole thing foldable and readable from the keyboard, and a pull request opened from its link
+> — public or, with a token of your own, private. The numbers below are measured and
 > reproducible.
 
 ## Where it stands today
@@ -17,6 +18,12 @@ Colours are computed off the main thread and land when they land — the diff is
 they do. An edited line shows which words changed, and the two versions can be read side by
 side. Files and hunks fold, a hunk too large to scroll past opens in chunks, and the whole diff
 is one tab stop that the keyboard walks.
+
+A pull request opens from the link you paste, at an address you can share and leave with the
+back button. The unchanged lines `-U3` left out are fetched and put back where they belong,
+checked against the diff first so a branch that moved since cannot quietly show you the wrong
+ones. Reading a private repository takes a token you make and keep; it is checked before it is
+kept, sent to one host, and never put in the address bar.
 
 Measured on an AMD Ryzen 7 5800H against a production build, median of three runs each in a
 fresh page.
