@@ -101,11 +101,22 @@ export function DiffRow({
       */}
       <div className="sticky left-0 z-10 flex bg-neutral-950" aria-hidden>
         <div className={`flex select-none ${EDGE_STYLES[line.kind]} ${ROW_STYLES[line.kind]}`}>
+          {/*
+            One number, not two.
+
+            The second column was blank on every line that changed — which is
+            the only kind of line a reader came here for — and nothing told
+            the two apart: no placeholder, no dimming, just a gap that moved
+            from one side to the other depending on what the line was. Read
+            down a hunk it interleaved rather than informed.
+
+            The number shown is the one the line has after the change, and
+            the one it had before where it no longer exists after. That is
+            already what the spoken label says, so the gutter and the screen
+            reader now name the same line.
+          */}
           <span className="w-12 shrink-0 pr-2 text-right text-neutral-400 tabular-nums">
-            {line.oldNumber}
-          </span>
-          <span className="w-12 shrink-0 pr-2 text-right text-neutral-400 tabular-nums">
-            {line.newNumber}
+            {line.newNumber ?? line.oldNumber}
           </span>
           <span className={`w-4 shrink-0 text-center ${MARKER_STYLES[line.kind]}`}>
             {MARKERS[line.kind]}

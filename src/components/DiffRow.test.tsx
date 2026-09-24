@@ -88,6 +88,38 @@ describe('the line-number gutter', () => {
     expect(String(tinted!.className).split(' ')).toContain(expected)
   })
 
+  /**
+   * Two columns meant one of them was blank on every line that had changed,
+   * with nothing to say which was which. The one that remains names the line
+   * as it stands after the change, falling back to what it was before on a
+   * line that no longer exists after — the same number `spokenLabel` reads
+   * out, so the gutter and the screen reader agree.
+   */
+  describe('showing one number per line', () => {
+    const numbersOn = (kind: DiffLine['kind']): string[] => {
+      const { container } = render(<DiffRow line={lineOf(kind)} segments={null} />)
+      return [...gutterOf(container).querySelectorAll('.tabular-nums')].map((span) =>
+        (span.textContent ?? '').trim(),
+      )
+    }
+
+    it.each(KINDS)('shows exactly one, for a %s line', (kind) => {
+      expect(numbersOn(kind)).toHaveLength(1)
+    })
+
+    it('shows the number a line has after the change', () => {
+      const line: DiffLine = { ...lineOf('insert'), oldNumber: null, newNumber: 42 }
+      const { container } = render(<DiffRow line={line} segments={null} />)
+      expect(gutterOf(container).querySelector('.tabular-nums')?.textContent).toBe('42')
+    })
+
+    it('falls back to the number a removed line had before it', () => {
+      const line: DiffLine = { ...lineOf('delete'), oldNumber: 7, newNumber: null }
+      const { container } = render(<DiffRow line={line} segments={null} />)
+      expect(gutterOf(container).querySelector('.tabular-nums')?.textContent).toBe('7')
+    })
+  })
+
   it('keeps the numbers out of a copied selection', () => {
     const { container } = render(<DiffRow line={lineOf('context')} segments={null} />)
     expect(gutterOf(container).querySelector('.select-none')).not.toBeNull()
