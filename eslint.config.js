@@ -45,4 +45,15 @@ export default tseslint.config(
     files: ['bench/**/*.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
+  {
+    /*
+     * shadcn's files, copied in by its CLI and kept as they arrive so the
+     * next `shadcn add` is a clean overwrite rather than a merge. Its button
+     * exports `buttonVariants` beside the component, which Fast Refresh
+     * objects to — a real rule about our own files, and not one worth
+     * editing someone else's code to satisfy.
+     */
+    files: ['src/components/ui/**'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 )

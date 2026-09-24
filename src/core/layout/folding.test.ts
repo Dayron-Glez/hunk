@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFixture } from '../../../tests/fixtures'
 import { parseUnifiedDiff } from '../parse/unified'
 import { EXPAND_BY, Folding, LARGE_HUNK, type HunkRef } from './folding'
-import { RowIndex, RowKind } from './rowIndex'
+import { RowIndex, RowKind, hunkKey } from './rowIndex'
 
 const indexOf = (set: 'github' | 'edge', name: string): RowIndex =>
   new RowIndex(parseUnifiedDiff(readFixture(set, name)))
@@ -168,9 +168,46 @@ describe('at scale', () => {
     const elapsed = performance.now() - startedAt
 
     expect(folded.length).toBeLessThan(folding.length)
-    // 4.4 ms measured over 64.807 rows. A fold that took long enough to feel
+    // 5.1 ms measured over 64.807 rows. A fold that took long enough to feel
     // would defeat the point of folding a diff this size.
     expect(elapsed).toBeLessThan(50)
+  })
+
+  /**
+   * The first projection is not a click — it is on the path to first paint,
+   * with the index, the heights and the tree all still to build. It used to
+   * cost 7.5 ms of that, because it walked every row to count what each hunk
+   * holds and then walked them again to project. The index counts as it
+   * writes now, so this is one pass: 2.3 ms.
+   */
+  it('builds the first projection without walking twice', () => {
+    const rows = indexOf('github', 'linux-93e4b307-huge.diff')
+    Folding.initial(rows)
+
+    const startedAt = performance.now()
+    const folding = Folding.initial(rows)
+    const elapsed = performance.now() - startedAt
+
+    expect(folding.length).toBeGreaterThan(50_000)
+    expect(elapsed).toBeLessThan(30)
+  })
+
+  it('counts the same rows per hunk the index wrote', () => {
+    const rows = indexOf('github', 'linux-93e4b307-huge.diff')
+    const folding = Folding.initial(rows)
+
+    const counted = new Map<number, number>()
+    for (let row = 0; row < rows.length; row += 1) {
+      if (rows.kindAt(row) !== RowKind.Line) continue
+      const key = hunkKey(rows.fileIndexAt(row), rows.hunkIndexAt(row))
+      counted.set(key, (counted.get(key) ?? 0) + 1)
+    }
+
+    expect(counted.size).toBeGreaterThan(1_000)
+    for (const [key, total] of counted) {
+      const file = Math.floor(key / 0x10000)
+      expect(folding.rowsIn({ file, hunk: key - file * 0x10000 })).toBe(total)
+    }
   })
 })
 

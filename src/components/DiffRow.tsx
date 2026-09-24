@@ -52,24 +52,35 @@ export function DiffRow({
       role="gridcell"
       className={`flex min-h-5 w-max min-w-full leading-5 ${ROW_STYLES[line.kind]}`}
     >
-      {/* Sticky so the numbers stay put while a long line scrolls, and unselectable
-          so copying a block of the diff yields code rather than code plus gutters. */}
       <span className="sr-only select-none">
         {spokenLabel(line, line.newNumber ?? line.oldNumber)}
       </span>
-      <div
-        className={`sticky left-0 z-10 flex select-none ${ROW_STYLES[line.kind]} bg-neutral-950`}
-        aria-hidden
-      >
-        <span className="w-12 shrink-0 pr-2 text-right text-neutral-400 tabular-nums">
-          {line.oldNumber}
-        </span>
-        <span className="w-12 shrink-0 pr-2 text-right text-neutral-400 tabular-nums">
-          {line.newNumber}
-        </span>
-        <span className={`w-4 shrink-0 text-center ${MARKER_STYLES[line.kind]}`}>
-          {MARKERS[line.kind]}
-        </span>
+      {/*
+        Sticky so the numbers stay put while a long line scrolls, and
+        unselectable so copying a block of the diff yields code rather than
+        code plus gutters.
+
+        Two elements, because one cannot hold two backgrounds. Sticky means
+        overlapping, so the gutter needs an opaque base or the line slides
+        into view underneath it — and the row's tint has to sit on that base
+        rather than replace it. Written as one element carrying both classes,
+        which of the two won was whichever Tailwind happened to emit last:
+        transparent on a context line, the tint on a removal, the base on an
+        insertion. Two of the three let the code through and the third lost
+        its colour.
+      */}
+      <div className="sticky left-0 z-10 flex bg-neutral-950" aria-hidden>
+        <div className={`flex select-none ${ROW_STYLES[line.kind]}`}>
+          <span className="w-12 shrink-0 pr-2 text-right text-neutral-400 tabular-nums">
+            {line.oldNumber}
+          </span>
+          <span className="w-12 shrink-0 pr-2 text-right text-neutral-400 tabular-nums">
+            {line.newNumber}
+          </span>
+          <span className={`w-4 shrink-0 text-center ${MARKER_STYLES[line.kind]}`}>
+            {MARKERS[line.kind]}
+          </span>
+        </div>
       </div>
       <span className="whitespace-pre text-neutral-200">
         <LineContent line={line} segments={segments} />

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { readFixture } from '../../../tests/fixtures'
 import { RowIndex } from '../layout/rowIndex'
 import { parseUnifiedDiff } from '../parse/unified'
-import { HighlightStore, worthHighlighting, type Highlighter } from './store'
+import { HighlightCache, HighlightStore, worthHighlighting, type Highlighter } from './store'
 import { flatten, type FlatTokens } from './tokens'
 
 /**
@@ -353,5 +353,75 @@ describe('intra-line work is done per line, not per hunk', () => {
       for (const segment of store.segmentsFor(row) ?? []) if (segment.changed) changed += 1
     }
     expect(changed).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * Expanding a gap changes one hunk of one file, and rebuilds the row index
+ * over the result. Before the cache was keyed by hunk, that threw away every
+ * hunk already coloured — on a 6.649-line hunk, seconds of the worker's work,
+ * for a click that changed twenty lines somewhere else.
+ */
+describe('what survives the index being rebuilt', () => {
+  it('colours a hunk again only when the hunk itself changed', async () => {
+    const diff = parseUnifiedDiff(readFixture('github', 'vite-pr-23378-new-files.diff'))
+    const rows = new RowIndex(diff)
+    const cache = new HighlightCache()
+    const highlighter = fakeHighlighter(() => '#FFF')
+
+    const first = new HighlightStore(rows, highlighter, ignore, cache)
+    first.requestRange(0, rows.length - 1)
+    await settle()
+    const asked = highlighter.calls.length
+    expect(asked).toBeGreaterThan(0)
+
+    // The same diff with one file's hunks replaced, as an expansion leaves it.
+    const changed = diff.files[1]!
+    const rebuilt = {
+      ...diff,
+      files: diff.files.map((file) =>
+        file === changed ? { ...file, hunks: file.hunks.map((h) => ({ ...h })) } : file,
+      ),
+    }
+
+    const second = new HighlightStore(new RowIndex(rebuilt), highlighter, ignore, cache)
+    second.requestRange(0, new RowIndex(rebuilt).length - 1)
+    await settle()
+
+    // Only the file whose hunks are new objects was asked about again.
+    const again = highlighter.calls.length - asked
+    expect(again).toBeGreaterThan(0)
+    expect(again).toBeLessThan(asked)
+  })
+
+  it('asks for nothing at all when no hunk changed', async () => {
+    const diff = parseUnifiedDiff(readFixture('github', 'vite-pr-23346-normal.diff'))
+    const rows = new RowIndex(diff)
+    const cache = new HighlightCache()
+    const highlighter = fakeHighlighter(() => '#FFF')
+
+    new HighlightStore(rows, highlighter, ignore, cache).requestRange(0, rows.length - 1)
+    await settle()
+    const asked = highlighter.calls.length
+
+    // A new index over the very same hunks: a layout switch, or a fold.
+    const split = new RowIndex(diff, 'split')
+    new HighlightStore(split, highlighter, ignore, cache).requestRange(0, split.length - 1)
+    await settle()
+
+    expect(highlighter.calls.length).toBe(asked)
+  })
+
+  it('keeps a cache of its own when none is handed to it', async () => {
+    const { rows } = load('vite-pr-23346-normal.diff')
+    const highlighter = fakeHighlighter(() => '#FFF')
+
+    const a = new HighlightStore(rows, highlighter, ignore)
+    const b = new HighlightStore(rows, highlighter, ignore)
+    a.requestRange(0, rows.length - 1)
+    b.requestRange(0, rows.length - 1)
+    await settle()
+
+    expect(a.requested).toBe(b.requested)
   })
 })

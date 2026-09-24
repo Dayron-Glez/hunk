@@ -1,7 +1,7 @@
 import { pairChangedLines } from '../diff/pairLines'
 import { wordDiff, type Range } from '../diff/wordDiff'
 import type { Column, RowIndex } from '../layout/rowIndex'
-import type { DiffLine } from '../parse/types'
+import type { DiffLine, Hunk } from '../parse/types'
 import { languageOf } from './language'
 import { mergeSegments, type Segment } from './segments'
 import { reconstructSides, sideForLine, type HunkSides } from './sides'
@@ -53,6 +53,47 @@ interface Entry {
 }
 
 /**
+ * What has been coloured so far, kept by the hunk itself.
+ *
+ * By the hunk object, not by its position: a row index is rebuilt whenever
+ * the document changes — an opened gap, a layout switch — and a cache keyed
+ * by position would be thrown away whole every time. Expanding one gap of one
+ * file left every other file to be tokenized again from nothing, which on a
+ * 6.649-line hunk cost seconds.
+ *
+ * Only the hunks that actually changed are new objects, so only they miss.
+ * That is also exactly right: a hunk that gained lines is no longer the hunk
+ * those tokens described.
+ */
+export class HighlightCache {
+  private readonly entries = new Map<Hunk, Entry | null>()
+
+  get(hunk: Hunk): Entry | null | undefined {
+    return this.entries.get(hunk)
+  }
+
+  has(hunk: Hunk): boolean {
+    return this.entries.has(hunk)
+  }
+
+  set(hunk: Hunk, entry: Entry | null): void {
+    this.entries.set(hunk, entry)
+  }
+
+  /** Hunks asked for so far, for tests and for the benchmark to report. */
+  get size(): number {
+    return this.entries.size
+  }
+
+  /** Lines whose intra-line changes have been worked out. For tests. */
+  get diffedLines(): number {
+    let total = 0
+    for (const entry of this.entries.values()) total += entry?.ranges.size ?? 0
+    return total
+  }
+}
+
+/**
  * Keeps highlighted hunks, and asks for the ones coming into view.
  *
  * Work is per hunk rather than per row because a grammar needs the lines around
@@ -60,17 +101,26 @@ interface Entry {
  * file a diff actually contains. Results are kept for the life of the diff: a
  * reader scrolls back, and re-colouring what they already saw would spend the
  * budget twice.
+ *
+ * The cache can outlive the store, and should: the store is tied to a row
+ * index, and the row index is rebuilt far more often than the hunks change.
  */
 export class HighlightStore {
   private readonly rows: RowIndex
   private readonly highlighter: Highlighter
   private readonly onChange: () => void
-  private readonly entries = new Map<number, Entry | null>()
+  private readonly entries: HighlightCache
 
-  constructor(rows: RowIndex, highlighter: Highlighter, onChange: () => void) {
+  constructor(
+    rows: RowIndex,
+    highlighter: Highlighter,
+    onChange: () => void,
+    cache: HighlightCache = new HighlightCache(),
+  ) {
     this.rows = rows
     this.highlighter = highlighter
     this.onChange = onChange
+    this.entries = cache
   }
 
   /** Start colouring whatever these rows belong to. Returns without waiting. */
@@ -78,10 +128,10 @@ export class HighlightStore {
     const from = Math.max(0, first)
     const to = Math.min(this.rows.length - 1, last)
 
-    let lastKey = -1
+    let lastKey: Hunk | null = null
     for (let row = from; row <= to; row += 1) {
       const key = this.keyOf(row)
-      if (key === -1 || key === lastKey) continue
+      if (key === null || key === lastKey) continue
       lastKey = key
       if (!this.entries.has(key)) this.start(key, row)
     }
@@ -98,7 +148,7 @@ export class HighlightStore {
    */
   spansFor(row: number, column?: Column): Span[] | null {
     const key = this.keyOf(row)
-    if (key === -1) return null
+    if (key === null) return null
 
     const entry = this.entries.get(key)
     if (!entry?.done) return null
@@ -125,7 +175,7 @@ export class HighlightStore {
    */
   segmentsFor(row: number, column?: Column): Segment[] | null {
     const key = this.keyOf(row)
-    if (key === -1) return null
+    if (key === null) return null
 
     const entry = this.entries.get(key)
     if (entry == null) return null
@@ -148,9 +198,7 @@ export class HighlightStore {
 
   /** Lines whose intra-line changes have been worked out. For tests. */
   get diffedLines(): number {
-    let total = 0
-    for (const entry of this.entries.values()) total += entry?.ranges.size ?? 0
-    return total
+    return this.entries.diffedLines
   }
 
   /** The line a question is about: one named cell, or whatever the row shows. */
@@ -158,21 +206,14 @@ export class HighlightStore {
     return column === undefined ? this.rows.lineIndexAt(row) : this.rows.cellIndexAt(row, column)
   }
 
-  private keyOf(row: number): number {
-    if (row < 0 || row >= this.rows.length) return -1
-    const hunkIndex = this.rows.hunkIndexAt(row)
-    if (hunkIndex === -1) return -1
-    // One number per hunk of the diff, so the map needs no string keys.
-    return this.rows.fileIndexAt(row) * 0x10000 + hunkIndex
+  /** The hunk itself is the key: it survives the index being rebuilt. */
+  private keyOf(row: number): Hunk | null {
+    if (row < 0 || row >= this.rows.length) return null
+    return this.rows.hunkAt(row)
   }
 
-  private start(key: number, row: number): void {
+  private start(hunk: Hunk, row: number): void {
     const file = this.rows.fileAt(row)
-    const hunk = this.rows.hunkAt(row)
-    if (hunk === null) {
-      this.entries.set(key, null)
-      return
-    }
 
     const sides = reconstructSides(hunk)
     const entry: Entry = {
@@ -186,7 +227,7 @@ export class HighlightStore {
       newTokens: null,
       done: false,
     }
-    this.entries.set(key, entry)
+    this.entries.set(hunk, entry)
 
     // Colour is optional; what changed inside a line is not, so it is found
     // here whether or not a grammar exists for this file.

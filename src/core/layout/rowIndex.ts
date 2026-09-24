@@ -1,4 +1,5 @@
 import { GHOST, alignHunk, alignedRowCount } from '../diff/align'
+import { gapsIn, type Gap } from '../expand/gaps'
 import type { DiffFile, DiffLine, Hunk, ParsedDiff } from '../parse/types'
 
 /** An object rather than an enum: the build bans non-erasable syntax, and the
@@ -9,6 +10,8 @@ export const RowKind = {
   Note: 1,
   HunkHeader: 2,
   Line: 3,
+  /** Unchanged lines the diff left out, which can be fetched and shown. */
+  Gap: 4,
 } as const
 
 export type RowKind = (typeof RowKind)[keyof typeof RowKind]
@@ -21,6 +24,11 @@ export type Column = 'old' | 'new'
 
 /** Stored in the typed arrays where a row has no hunk or no line of its own. */
 const ABSENT = 0xffffffff
+
+/** One number for a hunk, so the maps keyed by it need no object per lookup. */
+export function hunkKey(file: number, hunk: number): number {
+  return file * 0x10000 + hunk
+}
 
 /**
  * The diff flattened into a numbered list of rows, so "what is row 47.312?" is
@@ -46,16 +54,35 @@ export class RowIndex {
   private readonly newCells: Uint32Array | null
   /** Row where each file begins, for jumping between them. */
   private readonly fileStarts: Uint32Array
+  /** Gap shown at a row, where one is. Null unless the diff can be expanded. */
+  private readonly gapOfRow: (Gap | null)[] | null
+  /** Line rows each hunk holds, counted while they are written. */
+  private readonly rowsPerHunk = new Map<number, number>()
   private readonly diff: ParsedDiff
   readonly mode: LayoutMode
 
-  constructor(diff: ParsedDiff, mode: LayoutMode = 'unified') {
+  /**
+   * `expandable` adds a row wherever the diff left unchanged lines out. Only
+   * a diff that came from somewhere those lines can be fetched gets them: a
+   * pasted `.diff` carries no repository, and offering to expand what cannot
+   * be reached would be a button that does nothing.
+   *
+   * Only gaps with two ends. The space after the last hunk has no end until
+   * the file has been fetched, and a row that might turn out to cover nothing
+   * is worse than no row.
+   */
+  constructor(diff: ParsedDiff, mode: LayoutMode = 'unified', expandable = false) {
     this.diff = diff
     this.mode = mode
     const split = mode === 'split'
 
+    const gapsByFile = expandable
+      ? diff.files.map((file) => gapsIn(file).filter((gap) => gap.before !== -1))
+      : null
+
     let count = 0
-    for (const file of diff.files) {
+    for (let fileIndex = 0; fileIndex < diff.files.length; fileIndex += 1) {
+      const file = diff.files[fileIndex]!
       count += 1
       if (file.hunks.length === 0) {
         count += 1
@@ -64,6 +91,7 @@ export class RowIndex {
       for (const hunk of file.hunks) {
         count += 1 + (split ? alignedRowCount(hunk.lines) : hunk.lines.length)
       }
+      count += gapsByFile?.[fileIndex]?.length ?? 0
     }
 
     this.kinds = new Uint8Array(count)
@@ -72,6 +100,7 @@ export class RowIndex {
     this.oldCells = new Uint32Array(count).fill(ABSENT)
     this.newCells = split ? new Uint32Array(count).fill(ABSENT) : null
     this.fileStarts = new Uint32Array(diff.files.length)
+    this.gapOfRow = gapsByFile === null ? null : new Array<Gap | null>(count).fill(null)
 
     let row = 0
     for (let fileIndex = 0; fileIndex < diff.files.length; fileIndex += 1) {
@@ -89,13 +118,31 @@ export class RowIndex {
         continue
       }
 
+      const fileGaps = gapsByFile?.[fileIndex] ?? []
+
       for (let hunkIndex = 0; hunkIndex < file.hunks.length; hunkIndex += 1) {
         const hunk = file.hunks[hunkIndex]!
+
+        // The gap sits above the hunk it runs into, which is where a reader
+        // looking at that hunk would reach for it.
+        const gap = fileGaps.find((candidate) => candidate.before === hunkIndex)
+        if (gap !== undefined && this.gapOfRow !== null) {
+          this.kinds[row] = RowKind.Gap
+          this.files[row] = fileIndex
+          this.hunks[row] = hunkIndex
+          this.gapOfRow[row] = gap
+          row += 1
+        }
 
         this.kinds[row] = RowKind.HunkHeader
         this.files[row] = fileIndex
         this.hunks[row] = hunkIndex
         row += 1
+
+        // Counted here rather than walked for later: this loop already knows
+        // which hunk it is writing, and folding needs the total on every
+        // projection it builds.
+        const firstLineRow = row
 
         if (this.newCells === null) {
           for (let lineIndex = 0; lineIndex < hunk.lines.length; lineIndex += 1) {
@@ -105,16 +152,19 @@ export class RowIndex {
             this.oldCells[row] = lineIndex
             row += 1
           }
-          continue
+        } else {
+          for (const cells of alignHunk(hunk.lines)) {
+            this.kinds[row] = RowKind.Line
+            this.files[row] = fileIndex
+            this.hunks[row] = hunkIndex
+            if (cells.old !== GHOST) this.oldCells[row] = cells.old
+            if (cells.new !== GHOST) this.newCells[row] = cells.new
+            row += 1
+          }
         }
 
-        for (const cells of alignHunk(hunk.lines)) {
-          this.kinds[row] = RowKind.Line
-          this.files[row] = fileIndex
-          this.hunks[row] = hunkIndex
-          if (cells.old !== GHOST) this.oldCells[row] = cells.old
-          if (cells.new !== GHOST) this.newCells[row] = cells.new
-          row += 1
+        if (row > firstLineRow) {
+          this.rowsPerHunk.set(hunkKey(fileIndex, hunkIndex), row - firstLineRow)
         }
       }
     }
@@ -126,6 +176,14 @@ export class RowIndex {
 
   get fileCount(): number {
     return this.fileStarts.length
+  }
+
+  /**
+   * Line rows each hunk holds, by `hunkKey` — in rows, not lines, because the
+   * two-column layout puts a replacement and its replaced line on one of them.
+   */
+  hunkRowCounts(): ReadonlyMap<number, number> {
+    return this.rowsPerHunk
   }
 
   kindAt(row: number): RowKind {
@@ -166,6 +224,12 @@ export class RowIndex {
 
   fileAt(row: number): DiffFile {
     return this.diff.files[this.fileIndexAt(row)]!
+  }
+
+  /** The unchanged lines this row offers to fetch, or null for anything else. */
+  gapAt(row: number): Gap | null {
+    this.assertRow(row)
+    return this.gapOfRow?.[row] ?? null
   }
 
   /** The hunk this row belongs to, or null for a file header or a note. */
