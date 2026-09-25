@@ -28,9 +28,9 @@ import { ExpanderRow, FileHeaderRow, GapRow, HunkHeaderRow, NoteRow, type GapSta
 /** Starting points only — every row that reaches the screen is measured. They
  *  keep the scrollbar roughly right on the first frame. */
 const ESTIMATED_HEIGHT: Record<RowKind, number> = {
-  [RowKind.FileHeader]: 37,
+  [RowKind.FileHeader]: 54,
   [RowKind.Note]: 52,
-  [RowKind.HunkHeader]: 24,
+  [RowKind.HunkHeader]: 32,
   [RowKind.Line]: 20,
   [RowKind.Gap]: 29,
 }

@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react'
 import type { DiffFile, Hunk } from '../core/parse/types'
 import { describeEmptyBody, describeMode, describePath } from './fileSummary'
 
@@ -109,10 +110,17 @@ export function NoteRow({ file }: { readonly file: DiffFile }) {
  * tells a screen reader nothing.
  *
  * Out of the tab order on purpose. Only the rows on screen exist, so tabbing
- * would walk a list that rearranges itself under the reader as it scrolls,
+ * would walk a set that rearranges itself under the reader as it scrolls,
  * and its length would depend on the viewport. The grid is one tab stop and
  * Enter on the focused row does this, which is the pattern a grid is supposed
  * to follow anyway.
+ *
+ * It used to be `›` and `⌄` in a span of `w-3` inside `px-1`: about 12 by 16
+ * pixels, under what WCAG 2.2 asks of a pointer target, with no outline of
+ * its own and nothing to say it could be pressed. It is 24 by 24 now, with a
+ * surface that appears under the pointer, and one icon that turns rather than
+ * two characters that swap — a shape that rotates reads as the same control
+ * in a new state, where a different glyph reads as a different control.
  */
 function Chevron({
   collapsed,
@@ -130,11 +138,12 @@ function Chevron({
       onClick={onToggle}
       aria-expanded={!collapsed}
       aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
-      className="shrink-0 rounded px-1 text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-200"
+      className="inline-flex size-6 shrink-0 items-center justify-center rounded text-neutral-400 hover:bg-neutral-700/60 hover:text-neutral-100 focus-visible:bg-neutral-700/60 focus-visible:text-neutral-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-400"
     >
-      <span aria-hidden className="inline-block w-3 text-center">
-        {collapsed ? '›' : '⌄'}
-      </span>
+      <ChevronRight
+        aria-hidden
+        className={`size-4 transition-transform ${collapsed ? '' : 'rotate-90'}`}
+      />
     </button>
   )
 }

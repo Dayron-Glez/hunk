@@ -198,6 +198,71 @@ describe('two columns', () => {
  * testable is that the thing on screen is a control rather than a line: that
  * it says what it is, says where it stands, and answers a keyboard.
  */
+/**
+ * The fold controls.
+ *
+ * They were `›` and `⌄` in a span of `w-3` inside `px-1` — about 12 by 16
+ * pixels, under what WCAG 2.2 asks of a pointer target, with nothing to say
+ * they could be pressed at all. Size is not something jsdom can answer, since
+ * it does no layout, so what is pinned here is the class that sets it and the
+ * things that are answerable: an icon rather than a character, one shape that
+ * turns rather than two that swap, and the label and tab order unchanged.
+ */
+describe('the fold controls', () => {
+  const chevrons = (): HTMLElement[] => {
+    globalThis.testViewportHeight = 100_000
+    return screen.getAllByRole('button', { name: /^(Collapse|Expand) / })
+  }
+
+  const open = (): HTMLElement[] => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+    return chevrons()
+  }
+
+  it('is a target of 24 by 24, not a glyph of 12 by 16', () => {
+    for (const chevron of open()) {
+      expect(chevron.className).toContain('size-6')
+    }
+  })
+
+  it('shows an icon rather than a character', () => {
+    for (const chevron of open()) {
+      expect(chevron.querySelector('svg')).not.toBeNull()
+      expect(chevron.textContent).toBe('')
+    }
+  })
+
+  /** A shape that turns reads as the same control in a new state; a
+   *  different glyph reads as a different control. */
+  it('turns the same icon rather than swapping it', () => {
+    const [first] = open()
+    const iconOf = (button: HTMLElement): SVGElement => {
+      const icon = button.querySelector('svg')
+      if (icon === null) throw new Error('no icon')
+      return icon
+    }
+
+    expect(first).toHaveAttribute('aria-expanded', 'true')
+    const expanded = iconOf(first!).getAttribute('class')
+    expect(expanded).toContain('rotate-90')
+
+    fireEvent.click(first!)
+    const collapsed = screen.getAllByRole('button', { name: /^Expand / })[0]!
+    const turned = iconOf(collapsed).getAttribute('class')
+    expect(turned).not.toContain('rotate-90')
+    // The same icon, minus the turn: nothing else about it changed.
+    expect(expanded?.replace(' rotate-90', '')).toBe(turned)
+  })
+
+  it('carries an affordance of its own, so it is not part of the header', () => {
+    for (const chevron of open()) {
+      expect(chevron.className).toContain('hover:bg-neutral-700/60')
+      expect(chevron.className).toContain('focus-visible:outline-sky-400')
+    }
+  })
+})
+
 describe('sharing the view between the two columns', () => {
   const dividers = (): HTMLElement[] => screen.getAllByRole('separator')
   /** The first file's, which is the one every assertion below moves. */
