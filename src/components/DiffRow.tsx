@@ -4,8 +4,24 @@ import type { DiffLine } from '../core/parse/types'
 
 const ROW_STYLES: Record<DiffLine['kind'], string> = {
   context: 'bg-transparent',
-  insert: 'bg-emerald-500/10',
-  delete: 'bg-rose-500/10',
+  insert: 'bg-diff-added',
+  delete: 'bg-diff-removed',
+}
+
+/**
+ * The bar down the left of a changed line.
+ *
+ * The tint cannot be made loud enough to carry this on its own: code sits on
+ * it, and every step up in the background costs the code contrast it cannot
+ * spare. The bar carries no text, so it can be the full ink — six times the
+ * page rather than one and a quarter — and it is what a reader actually sees
+ * when they glance down a file. A border on an element that already exists,
+ * not another one: the row count is the whole point of this viewer.
+ */
+const EDGE_STYLES: Record<DiffLine['kind'], string> = {
+  context: 'border-l-4 border-l-transparent',
+  insert: 'border-l-4 border-l-diff-added-ink',
+  delete: 'border-l-4 border-l-diff-removed-ink',
 }
 
 const MARKERS: Record<DiffLine['kind'], string> = {
@@ -16,8 +32,8 @@ const MARKERS: Record<DiffLine['kind'], string> = {
 
 const MARKER_STYLES: Record<DiffLine['kind'], string> = {
   context: 'text-neutral-600',
-  insert: 'text-emerald-400',
-  delete: 'text-rose-400',
+  insert: 'text-diff-added-ink',
+  delete: 'text-diff-removed-ink',
 }
 
 /**
@@ -34,10 +50,24 @@ function spokenLabel(line: DiffLine, number: number | null): string {
   return `Line${where}.`
 }
 
+/**
+ * The words that changed inside a changed line.
+ *
+ * It used to be a second tint laid over the row's: `emerald-400/25` on top of
+ * `emerald-500/10`, two shades of the same family stacking into a third
+ * nobody chose. One background now, and the difference it can make is small
+ * — the mark is only 1.26 times the row it sits in, because anything louder
+ * takes the code below 4.5:1.
+ *
+ * An underline in the edge's ink was tried to make up that difference and
+ * taken out again: inside code a horizontal rule under a run of characters
+ * reads as a strikethrough or a spell-check squiggle, and the reader has to
+ * work out it means neither. The box is quieter and says the right thing.
+ */
 const CHANGED_STYLES: Record<DiffLine['kind'], string> = {
   context: '',
-  insert: 'bg-emerald-400/25 rounded-[2px]',
-  delete: 'bg-rose-400/25 rounded-[2px]',
+  insert: 'bg-diff-added-mark rounded-[2px]',
+  delete: 'bg-diff-removed-mark rounded-[2px]',
 }
 
 export function DiffRow({
@@ -70,12 +100,23 @@ export function DiffRow({
         its colour.
       */}
       <div className="sticky left-0 z-10 flex bg-neutral-950" aria-hidden>
-        <div className={`flex select-none ${ROW_STYLES[line.kind]}`}>
+        <div className={`flex select-none ${EDGE_STYLES[line.kind]} ${ROW_STYLES[line.kind]}`}>
+          {/*
+            One number, not two.
+
+            The second column was blank on every line that changed — which is
+            the only kind of line a reader came here for — and nothing told
+            the two apart: no placeholder, no dimming, just a gap that moved
+            from one side to the other depending on what the line was. Read
+            down a hunk it interleaved rather than informed.
+
+            The number shown is the one the line has after the change, and
+            the one it had before where it no longer exists after. That is
+            already what the spoken label says, so the gutter and the screen
+            reader now name the same line.
+          */}
           <span className="w-12 shrink-0 pr-2 text-right text-neutral-400 tabular-nums">
-            {line.oldNumber}
-          </span>
-          <span className="w-12 shrink-0 pr-2 text-right text-neutral-400 tabular-nums">
-            {line.newNumber}
+            {line.newNumber ?? line.oldNumber}
           </span>
           <span className={`w-4 shrink-0 text-center ${MARKER_STYLES[line.kind]}`}>
             {MARKERS[line.kind]}
@@ -121,14 +162,32 @@ export function SplitDiffRow({
 }
 
 /**
- * Half a row, at half the viewport whatever it holds.
+ * Half a row, or whatever share of it the reader has asked for.
  *
  * A width from the content would make every row's divider land somewhere else,
  * and a width from the widest line in the column would mean measuring lines
  * nobody has scrolled to — the one thing this viewer refuses to do. So the
- * columns are fixed and a long line scrolls inside its own cell. The scrollbar
- * is hidden because a horizontal one is as tall as the row it would sit in.
+ * columns are set from outside and a long line is clipped by its cell, then
+ * moved as part of its whole column by the bar in that file's header.
+ *
+ * It used to scroll inside its own cell, which made scrolling a per-row
+ * affair: moving one long line left the line beneath it where it was.
+ *
+ * Both properties are written once, on the row. A prop would have to pass
+ * through every row on screen to reach a cell that has no other reason to
+ * know what the layout is doing, and would re-render all of them on every
+ * frame of a drag.
  */
+/**
+ * What each column takes from the two numbers a row carries: its share of the
+ * width, and how far it has been panned. Written with `_` where CSS needs a
+ * space, which is how Tailwind spells an arbitrary value.
+ */
+const OLD_PANE =
+  '[--hunk-pane:calc(var(--hunk-split,0.5)*100%)] [--hunk-shift:var(--hunk-pan-old,0px)]'
+const NEW_PANE =
+  '[--hunk-pane:calc((1_-_var(--hunk-split,0.5))*100%)] [--hunk-shift:var(--hunk-pan-new,0px)]'
+
 function SplitCell({
   line,
   segments,
@@ -138,11 +197,16 @@ function SplitCell({
   readonly segments: readonly Segment[] | null
   readonly column: 'old' | 'new'
 }) {
-  const edge = column === 'old' ? 'border-r border-neutral-800' : ''
-
+  // The two shares are written as one number on the grid; this is the half
+  // of it each column takes, as a static class rather than a style object
+  // that would be rebuilt for every cell on every frame of a drag.
+  const share = column === 'old' ? OLD_PANE : NEW_PANE
   if (line === null) {
     return (
-      <div role="gridcell" className={`w-1/2 shrink-0 bg-neutral-900/40 ${edge}`}>
+      <div
+        role="gridcell"
+        className={`${share} w-(--hunk-pane) shrink-0 border-l-4 border-l-transparent bg-neutral-900/40`}
+      >
         <span className="sr-only select-none">
           {column === 'old' ? 'No line here before.' : 'No line here after.'}
         </span>
@@ -151,7 +215,10 @@ function SplitCell({
   }
 
   return (
-    <div role="gridcell" className={`flex w-1/2 shrink-0 ${ROW_STYLES[line.kind]} ${edge}`}>
+    <div
+      role="gridcell"
+      className={`${share} flex w-(--hunk-pane) shrink-0 ${EDGE_STYLES[line.kind]} ${ROW_STYLES[line.kind]}`}
+    >
       <span className="sr-only select-none">
         {spokenLabel(line, column === 'old' ? line.oldNumber : line.newNumber)}
       </span>
@@ -167,20 +234,31 @@ function SplitCell({
       >
         {MARKERS[line.kind]}
       </span>
-      {/* Chrome makes a scrollable box a tab stop so it can be scrolled by
-          keyboard. Here that would put a stop on every long line on screen, in
-          a list that rearranges itself as it scrolls — 18 of them in 37 rows on
-          a real diff. The grid is the one stop, and its left and right arrows
-          pan this instead. */}
-      <span
-        tabIndex={-1}
-        data-pan
-        className="min-w-0 flex-1 [scrollbar-width:none] overflow-x-auto whitespace-pre text-neutral-200 outline-none [&::-webkit-scrollbar]:hidden"
-      >
-        <LineContent line={line} segments={segments} />
-        {line.noNewlineAtEof ? (
-          <span className="pl-4 text-neutral-500 italic select-none">no newline</span>
-        ) : null}
+      {/*
+        Moved rather than scrolled. A scrollable box is a tab stop in Chrome,
+        which put one on every long line on screen — 18 in 37 rows on a real
+        diff, in a list that rearranges itself as it scrolls — and scrolling
+        each cell made panning a per-row affair.
+
+        Two elements, because one cannot both clip and be measured. The outer
+        one is the window: it stays where the flex row puts it and cuts the
+        line off at its own left edge, which is what keeps a panned line from
+        painting over the number and the marker, both of which come earlier in
+        the row and so paint underneath. The inner one is the line at its full
+        width, which is the width the bar has to report — and a transform does
+        not change a layout width, so reading it costs one `offsetWidth` in
+        the pass that already measures these rows.
+      */}
+      <span className="min-w-0 flex-1 overflow-hidden">
+        <span
+          data-col={column}
+          className="block w-max translate-x-[calc(var(--hunk-shift,0px)*-1)] whitespace-pre text-neutral-200"
+        >
+          <LineContent line={line} segments={segments} />
+          {line.noNewlineAtEof ? (
+            <span className="pl-4 text-neutral-500 italic select-none">no newline</span>
+          ) : null}
+        </span>
       </span>
     </div>
   )

@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react'
 import type { DiffFile, Hunk } from '../core/parse/types'
 import { describeEmptyBody, describeMode, describePath } from './fileSummary'
 
@@ -30,7 +31,14 @@ export function FileHeaderRow({
   return (
     <div
       role="gridcell"
-      className="flex w-max min-w-full flex-wrap items-center gap-x-3 gap-y-1 border-t border-neutral-800 bg-neutral-900 px-3 py-2"
+      /* Where one file ends is a question a reader asks eight hundred times
+         down a kernel commit, and a single hairline shared with every other
+         border in the view did not answer it. A heavier rule above, a lighter
+         one below to close the header off, and padding rather than margin for
+         the air: the virtualizer measures with getBoundingClientRect, which
+         does not count margins, so a margin here would put every row below
+         this one out by its height. */
+      className="flex w-(--hunk-row,max-content) min-w-full flex-wrap items-center gap-x-3 gap-y-1 border-t-2 border-b border-t-neutral-600 border-b-neutral-800 bg-neutral-900 px-3 pt-4 pb-3"
     >
       <Chevron collapsed={collapsed} onToggle={onToggle} label={describePath(file)} />
       <span
@@ -47,8 +55,8 @@ export function FileHeaderRow({
         <span className="font-mono text-xs text-neutral-500">{describeMode(file)}</span>
       ) : null}
       <span className="ml-auto pl-6 font-mono text-xs">
-        <span className="text-emerald-400">+{file.additions}</span>{' '}
-        <span className="text-rose-400">-{file.deletions}</span>
+        <span className="text-diff-added-ink">+{file.additions}</span>{' '}
+        <span className="text-diff-removed-ink">-{file.deletions}</span>
       </span>
     </div>
   )
@@ -73,7 +81,7 @@ export function HunkHeaderRow({
   return (
     <div
       role="gridcell"
-      className="flex w-max min-w-full items-center gap-2 bg-sky-500/10 px-3 py-1 font-mono text-xs text-sky-300/70"
+      className="flex w-(--hunk-row,max-content) min-w-full items-center gap-2 bg-sky-500/10 px-3 py-1 font-mono text-xs text-sky-300/70"
     >
       <Chevron collapsed={collapsed} onToggle={onToggle} label={range} />
       <span className="cursor-help select-none" data-hint={explains}>
@@ -86,7 +94,10 @@ export function HunkHeaderRow({
 
 export function NoteRow({ file }: { readonly file: DiffFile }) {
   return (
-    <p role="gridcell" className="w-max min-w-full px-3 py-4 text-sm text-neutral-500">
+    <p
+      role="gridcell"
+      className="w-(--hunk-row,max-content) min-w-full px-3 py-4 text-sm text-neutral-500"
+    >
       {describeEmptyBody(file)}
     </p>
   )
@@ -102,10 +113,17 @@ export function NoteRow({ file }: { readonly file: DiffFile }) {
  * tells a screen reader nothing.
  *
  * Out of the tab order on purpose. Only the rows on screen exist, so tabbing
- * would walk a list that rearranges itself under the reader as it scrolls,
+ * would walk a set that rearranges itself under the reader as it scrolls,
  * and its length would depend on the viewport. The grid is one tab stop and
  * Enter on the focused row does this, which is the pattern a grid is supposed
  * to follow anyway.
+ *
+ * It used to be `›` and `⌄` in a span of `w-3` inside `px-1`: about 12 by 16
+ * pixels, under what WCAG 2.2 asks of a pointer target, with no outline of
+ * its own and nothing to say it could be pressed. It is 24 by 24 now, with a
+ * surface that appears under the pointer, and one icon that turns rather than
+ * two characters that swap — a shape that rotates reads as the same control
+ * in a new state, where a different glyph reads as a different control.
  */
 function Chevron({
   collapsed,
@@ -123,11 +141,12 @@ function Chevron({
       onClick={onToggle}
       aria-expanded={!collapsed}
       aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
-      className="shrink-0 rounded px-1 text-neutral-400 hover:bg-neutral-700/50 hover:text-neutral-200"
+      className="inline-flex size-6 shrink-0 items-center justify-center rounded text-neutral-400 hover:bg-neutral-700/60 hover:text-neutral-100 focus-visible:bg-neutral-700/60 focus-visible:text-neutral-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-400"
     >
-      <span aria-hidden className="inline-block w-3 text-center">
-        {collapsed ? '›' : '⌄'}
-      </span>
+      <ChevronRight
+        aria-hidden
+        className={`size-4 transition-transform ${collapsed ? '' : 'rotate-90'}`}
+      />
     </button>
   )
 }
@@ -155,7 +174,7 @@ export function ExpanderRow({
   return (
     <div
       role="gridcell"
-      className="flex w-max min-w-full items-center gap-3 border-y border-neutral-800 bg-neutral-900/60 px-3 py-1.5 text-xs"
+      className="flex w-(--hunk-row,max-content) min-w-full items-center gap-3 border-y border-neutral-800 bg-neutral-900/60 px-3 py-1.5 text-xs"
     >
       <button
         type="button"
@@ -220,7 +239,7 @@ export function GapRow({
   return (
     <div
       role="gridcell"
-      className="flex w-max min-w-full items-center gap-2 border-y border-neutral-800 bg-sky-500/5 px-3 py-1.5 text-xs"
+      className="flex w-(--hunk-row,max-content) min-w-full items-center gap-2 border-y border-neutral-800 bg-sky-500/5 px-3 py-1.5 text-xs"
     >
       {failed ? (
         <span role="alert" className="text-amber-200/90">

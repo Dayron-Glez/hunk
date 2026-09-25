@@ -49,7 +49,11 @@ describe('DiffView', () => {
   it('says when only the mode changed', () => {
     renderFixture('edge', 'mode-change-only.diff')
     expect(screen.getByText('Only the file mode changed.')).toBeInTheDocument()
-    expect(screen.getByText('100644 → 100755')).toBeInTheDocument()
+    // Twice: the header a reader sees pinned above the view is a copy of the
+    // row, since the rows of a file are not wrapped in anything for
+    // `position: sticky` to stick inside. The copy is `aria-hidden`, so a
+    // screen reader still hears it once.
+    expect(screen.getAllByText('100644 → 100755').length).toBeGreaterThan(0)
   })
 
   it('shows a rename as one path becoming another', () => {

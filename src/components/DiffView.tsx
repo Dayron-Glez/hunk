@@ -47,10 +47,10 @@ export function DiffView({
             {diff.files.length} {diff.files.length === 1 ? 'file' : 'files'}
           </span>
           <Explain text="Lines this change adds.">
-            <span className="cursor-help text-emerald-400">+{diff.additions}</span>
+            <span className="text-diff-added-ink cursor-help">+{diff.additions}</span>
           </Explain>
           <Explain text="Lines this change removes.">
-            <span className="cursor-help text-rose-400">-{diff.deletions}</span>
+            <span className="text-diff-removed-ink cursor-help">-{diff.deletions}</span>
           </Explain>
 
           <div className="ml-auto flex rounded border border-neutral-800" role="group">

@@ -189,6 +189,169 @@ describe('two columns', () => {
   })
 })
 
+/**
+ * The divider between the columns.
+ *
+ * What a browser does with a pointer is not testable here — `tests/setup.ts`
+ * stubs `ResizeObserver` as a no-op and hands back a fixed width — and the
+ * arithmetic it would drive is covered in `core/layout/panes`. What is
+ * testable is that the thing on screen is a control rather than a line: that
+ * it says what it is, says where it stands, and answers a keyboard.
+ */
+/**
+ * The fold controls.
+ *
+ * They were `›` and `⌄` in a span of `w-3` inside `px-1` — about 12 by 16
+ * pixels, under what WCAG 2.2 asks of a pointer target, with nothing to say
+ * they could be pressed at all. Size is not something jsdom can answer, since
+ * it does no layout, so what is pinned here is the class that sets it and the
+ * things that are answerable: an icon rather than a character, one shape that
+ * turns rather than two that swap, and the label and tab order unchanged.
+ */
+describe('the fold controls', () => {
+  const chevrons = (): HTMLElement[] => {
+    globalThis.testViewportHeight = 100_000
+    return screen.getAllByRole('button', { name: /^(Collapse|Expand) / })
+  }
+
+  const open = (): HTMLElement[] => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+    return chevrons()
+  }
+
+  it('is a target of 24 by 24, not a glyph of 12 by 16', () => {
+    for (const chevron of open()) {
+      expect(chevron.className).toContain('size-6')
+    }
+  })
+
+  it('shows an icon rather than a character', () => {
+    for (const chevron of open()) {
+      expect(chevron.querySelector('svg')).not.toBeNull()
+      expect(chevron.textContent).toBe('')
+    }
+  })
+
+  /** A shape that turns reads as the same control in a new state; a
+   *  different glyph reads as a different control. */
+  it('turns the same icon rather than swapping it', () => {
+    const [first] = open()
+    const iconOf = (button: HTMLElement): SVGElement => {
+      const icon = button.querySelector('svg')
+      if (icon === null) throw new Error('no icon')
+      return icon
+    }
+
+    expect(first).toHaveAttribute('aria-expanded', 'true')
+    const expanded = iconOf(first!).getAttribute('class')
+    expect(expanded).toContain('rotate-90')
+
+    fireEvent.click(first!)
+    const collapsed = screen.getAllByRole('button', { name: /^Expand / })[0]!
+    const turned = iconOf(collapsed).getAttribute('class')
+    expect(turned).not.toContain('rotate-90')
+    // The same icon, minus the turn: nothing else about it changed.
+    expect(expanded?.replace(' rotate-90', '')).toBe(turned)
+  })
+
+  it('carries an affordance of its own, so it is not part of the header', () => {
+    for (const chevron of open()) {
+      expect(chevron.className).toContain('hover:bg-neutral-700/60')
+      expect(chevron.className).toContain('focus-visible:outline-sky-400')
+    }
+  })
+})
+
+describe('sharing the view between the two columns', () => {
+  const dividers = (): HTMLElement[] => screen.getAllByRole('separator')
+  /** The first file's, which is the one every assertion below moves. */
+  const divider = (): HTMLElement => dividers()[0]!
+
+  const openSplit = (): void => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+  }
+
+  afterEach(() => {
+    localStorage.clear()
+  })
+
+  it('is there in two columns and not in one', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+    expect(screen.queryAllByRole('separator')).toHaveLength(0)
+  })
+
+  /** One per file on screen, not one for the diff: the lines in one file are
+   *  not the lines in the next, and a width that suits a lockfile does not
+   *  suit a header. */
+  it('gives each file its own, named after it', () => {
+    openSplit()
+    expect(dividers()).toHaveLength(2)
+    for (const one of dividers()) {
+      expect(one.getAttribute('aria-label')).toMatch(/^Width of the left column for \S/)
+    }
+  })
+
+  it('leaves the other files where they were', () => {
+    openSplit()
+    fireEvent.keyDown(dividers()[0]!, { key: 'End' })
+    expect(dividers()[0]).toHaveAttribute('aria-valuenow', '85')
+    expect(dividers()[1]).toHaveAttribute('aria-valuenow', '50')
+  })
+
+  it('says what it is and where it stands', () => {
+    openSplit()
+    expect(divider()).toHaveAttribute('aria-orientation', 'vertical')
+    expect(divider()).toHaveAttribute('aria-valuenow', '50')
+    expect(divider()).toHaveAttribute('aria-valuemin', '15')
+    expect(divider()).toHaveAttribute('aria-valuemax', '85')
+  })
+
+  /** The grid is one tab stop and the controls inside the rows are out of
+   *  the tab order, because those rearrange themselves as the reader
+   *  scrolls. There is exactly one divider and it does not move, so the
+   *  argument does not reach it. */
+  it('is reachable by keyboard', () => {
+    openSplit()
+    expect(divider().tabIndex).toBe(0)
+  })
+
+  it.each([
+    ['ArrowRight', '52'],
+    ['ArrowLeft', '48'],
+    ['Home', '15'],
+    ['End', '85'],
+  ])('moves on %s', (key, expected) => {
+    openSplit()
+    fireEvent.keyDown(divider(), { key })
+    expect(divider()).toHaveAttribute('aria-valuenow', expected)
+  })
+
+  it('stops at the limits rather than walking past them', () => {
+    openSplit()
+    fireEvent.keyDown(divider(), { key: 'Home' })
+    fireEvent.keyDown(divider(), { key: 'ArrowLeft' })
+    expect(divider()).toHaveAttribute('aria-valuenow', '15')
+  })
+
+  /** The grid below reads the same arrows to move between rows. */
+  it('keeps its arrows away from the grid', () => {
+    openSplit()
+    const event = createEvent.keyDown(divider(), { key: 'ArrowRight' })
+    fireEvent(divider(), event)
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it('comes back where it was left, under the path it belongs to', () => {
+    openSplit()
+    fireEvent.keyDown(divider(), { key: 'End' })
+    const stored: unknown = JSON.parse(localStorage.getItem('hunk.split-ratios') ?? '{}')
+    expect(stored).toEqual({ 'packages/vite/src/node/__tests__/utils.spec.ts': 0.85 })
+  })
+})
+
 describe('folding', () => {
   const rowTexts = (): string[] => Array.from(list().children).map((row) => row.textContent ?? '')
 
@@ -666,34 +829,47 @@ describe('reading it without seeing it', () => {
 describe('long lines in two columns', () => {
   const grid = (): HTMLElement => screen.getByRole('grid')
 
-  const panes = (): HTMLElement[] => Array.from(list().querySelectorAll<HTMLElement>('[data-pan]'))
+  const cells = (): HTMLElement[] => Array.from(list().querySelectorAll<HTMLElement>('[data-col]'))
 
-  it('keeps the scrollable cells out of the tab order', () => {
+  const openSplit = (): void => {
     globalThis.testViewportHeight = 100_000
     render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+  }
 
-    expect(panes().length).toBeGreaterThan(10)
-    for (const pane of panes()) expect(pane).toHaveAttribute('tabindex', '-1')
+  /** A scrollable box is a tab stop in Chrome, which put one on every long
+   *  line on screen. Nothing inside a row scrolls any more. */
+  it('leaves no scrollable box inside a row', () => {
+    openSplit()
+    expect(cells().length).toBeGreaterThan(10)
+    for (const cell of cells()) {
+      expect(cell.className).not.toContain('overflow-x-auto')
+      expect(cell).not.toHaveAttribute('tabindex')
+    }
   })
 
-  it('pans the row the reader is on with left and right', () => {
-    globalThis.testViewportHeight = 100_000
-    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+  /** Every file carries its own pair, inside its own header row, so nothing
+   *  floats over a line and a file's offset is its own. */
+  it('gives every file on screen a pair of bars in its header', () => {
+    openSplit()
+    const headers = document.querySelectorAll('[data-bars]')
+    expect(headers.length).toBeGreaterThan(1)
+    for (const found of headers) expect(found.querySelectorAll('[data-bar]')).toHaveLength(2)
+  })
 
+  /**
+   * That the arrows are the divider's and not the browser's. How far they
+   * move a column is held to the content's width, and jsdom reports every
+   * width as zero — so the limit is tested in `core/layout/panes` and the
+   * movement itself only in a browser.
+   */
+  it('takes the arrows in two columns, where nothing scrolls on its own', () => {
+    openSplit()
     fireEvent.keyDown(grid(), { key: 'Home' })
     fireEvent.keyDown(grid(), { key: 'j' })
-    fireEvent.keyDown(grid(), { key: 'j' })
 
-    const id = grid().getAttribute('aria-activedescendant')!
-    const row = document.getElementById(id)!
-    const pane = row.querySelector<HTMLElement>('[data-pan]')!
-    expect(pane.scrollLeft).toBe(0)
-
-    fireEvent.keyDown(grid(), { key: 'ArrowRight' })
-    expect(pane.scrollLeft).toBeGreaterThan(0)
-
-    fireEvent.keyDown(grid(), { key: 'ArrowLeft' })
-    expect(pane.scrollLeft).toBe(0)
+    const event = createEvent.keyDown(grid(), { key: 'ArrowRight' })
+    fireEvent(grid(), event)
+    expect(event.defaultPrevented).toBe(true)
   })
 
   it('leaves the arrows to the browser in one column, where the grid scrolls', () => {

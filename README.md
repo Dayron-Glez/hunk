@@ -3,7 +3,7 @@
 A diff viewer for the files that bring the others down. Paste a GitHub pull request URL, drop
 two files or a `.patch`, and read it.
 
-> **Status: F5 complete — every target is met, with room to spare.**
+> **Status: F6 complete — every target is met, with room to spare.**
 > Variable-height virtualization, syntax highlighting that arrives from a worker without
 > touching first paint, the change inside a line marked word by word in one column or two, the
 > whole thing foldable and readable from the keyboard, and a pull request opened from its link
@@ -100,6 +100,30 @@ browser there would be a constant wearing a costume. What is measured instead is
 blocking while scrolling, and it is **zero in all sixteen runs**, with the instrument made to
 prove itself before each of them.
 
+## Scrolling a line that is wider than its column
+
+In two columns each column is scrolled by a bar of its own, at the end of that file's rows.
+A cell clips its line and the line is moved by a transform, so one property moves a whole
+column at once — where before each cell scrolled on its own and moving one long line left
+the line beneath it where it was. The bars are per file, because the columns are: a width
+that suits a lockfile does not suit a header, and neither does a scroll position.
+
+**A bar only knows the widest row of its file that has been rendered, not the widest row it
+has.** This viewer will not measure lines nobody has scrolled to — that is what keeps the
+first paint flat as the diff grows — so it cannot know the second one, and a bar changes
+size as the reader moves down a long file. The same has always been true of the scrollbar in
+the one-column layout; showing one per column makes it visible rather than new. A file
+taller than the view shows no bar until its end comes up, and is panned with the arrow keys
+or a sideways wheel until then.
+
+**The grid itself no longer scrolls sideways in two columns.** A row that spans both — a file
+header, a hunk header, a gap — takes the width of the view there rather than of its content,
+so a long path wraps onto a second line instead of running off the edge. Left to overflow it
+gave the grid a horizontal scrollbar of its own across the bottom, which scrolled neither
+column and held itself up: the bar takes eleven pixels of height, the usable width shrinks
+with it, the content then fits, and `scrollWidth > clientWidth` reports false while the bar
+is still drawn. One column keeps its own bar, where the grid really is what scrolls.
+
 ## Reading it without a mouse, or without the screen
 
 The whole diff is **one tab stop**. Everything inside it is reached from there:
@@ -123,11 +147,16 @@ Each line says what it is — "Added line 595." — because the gutter it replac
 numbers and a punctuation mark read aloud. Those labels carry `select-none`, so copying a block
 of the diff still yields code and not code plus commentary.
 
-**Contrast is measured, not assumed.** Every text node on both screens and in both layouts is
-checked against the background it actually composites onto, with the WCAG AA threshold for its
-size: 484 elements in one column, 740 in two, and nothing under 4.5:1. That audit is what found
-the line numbers at **2.53:1** — `neutral-500` would not have fixed it either, at 3.54:1
-against a removed line.
+**Contrast is measured, not assumed.** `npm run audit:contrast` builds the viewer, walks the
+picker and both layouts in a real browser, and composites every text node against the
+background it actually sits on — which is rarely the page, since a changed row is a tint and a
+changed word is a stronger one on top of it. 1.236 text nodes and focus rings on the last run,
+nothing under 4.5:1, the narrowest text margin **5.25:1**.
+
+That audit is what found the line numbers at **2.53:1** — `neutral-500` would not have fixed it
+either, at 3.54:1 against a removed line. It is also what sets the diff palette: the row tints
+in `src/index.css` are as light as the code sitting on them allows and no lighter, which is why
+a changed line is marked by the bar down its left rather than by its background.
 
 Almost nothing moves. One colour transition on the drop zone, and one spinner while a pull
 request is being fetched — that one is behind `motion-safe`, so a reader who asks for less
@@ -170,6 +199,11 @@ Two of the cases that break parsers could not be found at all. Scanning hundreds
 across git, Linux, npm, Vite, prettier, Babel, TypeScript, esbuild and VS Code turned up not one
 `\ No newline at end of file` and not one file mode change. Rare in practice, still fatal, so
 they are produced by a script driving real git — byte-identical on every run.
+
+The picker offers eight of them as samples, and none of them is in the bundle a visitor
+downloads. `import.meta.glob` without `eager` compiles to a map of dynamic imports, so each
+sample is its own chunk and is fetched on the press: the entry is **383.560 bytes**, and the
+kernel commit's **2.123.252** sit beside it, reached only if someone asks for them.
 
 Of the 537 tests, 193 are invariants applied across the whole corpus, which means they
 already cover fixtures nobody has added yet. `fixtures/README.md` has the full list and what
