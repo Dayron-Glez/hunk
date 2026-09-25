@@ -189,6 +189,104 @@ describe('two columns', () => {
   })
 })
 
+/**
+ * The divider between the columns.
+ *
+ * What a browser does with a pointer is not testable here — `tests/setup.ts`
+ * stubs `ResizeObserver` as a no-op and hands back a fixed width — and the
+ * arithmetic it would drive is covered in `core/layout/panes`. What is
+ * testable is that the thing on screen is a control rather than a line: that
+ * it says what it is, says where it stands, and answers a keyboard.
+ */
+describe('sharing the view between the two columns', () => {
+  const dividers = (): HTMLElement[] => screen.getAllByRole('separator')
+  /** The first file's, which is the one every assertion below moves. */
+  const divider = (): HTMLElement => dividers()[0]!
+
+  const openSplit = (): void => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+  }
+
+  afterEach(() => {
+    localStorage.clear()
+  })
+
+  it('is there in two columns and not in one', () => {
+    globalThis.testViewportHeight = 100_000
+    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} />)
+    expect(screen.queryAllByRole('separator')).toHaveLength(0)
+  })
+
+  /** One per file on screen, not one for the diff: the lines in one file are
+   *  not the lines in the next, and a width that suits a lockfile does not
+   *  suit a header. */
+  it('gives each file its own, named after it', () => {
+    openSplit()
+    expect(dividers()).toHaveLength(2)
+    for (const one of dividers()) {
+      expect(one.getAttribute('aria-label')).toMatch(/^Width of the left column for \S/)
+    }
+  })
+
+  it('leaves the other files where they were', () => {
+    openSplit()
+    fireEvent.keyDown(dividers()[0]!, { key: 'End' })
+    expect(dividers()[0]).toHaveAttribute('aria-valuenow', '85')
+    expect(dividers()[1]).toHaveAttribute('aria-valuenow', '50')
+  })
+
+  it('says what it is and where it stands', () => {
+    openSplit()
+    expect(divider()).toHaveAttribute('aria-orientation', 'vertical')
+    expect(divider()).toHaveAttribute('aria-valuenow', '50')
+    expect(divider()).toHaveAttribute('aria-valuemin', '15')
+    expect(divider()).toHaveAttribute('aria-valuemax', '85')
+  })
+
+  /** The grid is one tab stop and the controls inside the rows are out of
+   *  the tab order, because those rearrange themselves as the reader
+   *  scrolls. There is exactly one divider and it does not move, so the
+   *  argument does not reach it. */
+  it('is reachable by keyboard', () => {
+    openSplit()
+    expect(divider().tabIndex).toBe(0)
+  })
+
+  it.each([
+    ['ArrowRight', '52'],
+    ['ArrowLeft', '48'],
+    ['Home', '15'],
+    ['End', '85'],
+  ])('moves on %s', (key, expected) => {
+    openSplit()
+    fireEvent.keyDown(divider(), { key })
+    expect(divider()).toHaveAttribute('aria-valuenow', expected)
+  })
+
+  it('stops at the limits rather than walking past them', () => {
+    openSplit()
+    fireEvent.keyDown(divider(), { key: 'Home' })
+    fireEvent.keyDown(divider(), { key: 'ArrowLeft' })
+    expect(divider()).toHaveAttribute('aria-valuenow', '15')
+  })
+
+  /** The grid below reads the same arrows to move between rows. */
+  it('keeps its arrows away from the grid', () => {
+    openSplit()
+    const event = createEvent.keyDown(divider(), { key: 'ArrowRight' })
+    fireEvent(divider(), event)
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it('comes back where it was left, under the path it belongs to', () => {
+    openSplit()
+    fireEvent.keyDown(divider(), { key: 'End' })
+    const stored: unknown = JSON.parse(localStorage.getItem('hunk.split-ratios') ?? '{}')
+    expect(stored).toEqual({ 'packages/vite/src/node/__tests__/utils.spec.ts': 0.85 })
+  })
+})
+
 describe('folding', () => {
   const rowTexts = (): string[] => Array.from(list().children).map((row) => row.textContent ?? '')
 

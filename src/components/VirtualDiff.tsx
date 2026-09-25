@@ -1,4 +1,5 @@
 import {
+  type CSSProperties,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -12,6 +13,9 @@ import type { Direction, Gap } from '../core/expand/gaps'
 import { sizeOf } from '../core/expand/gaps'
 import { EXPAND_BY, Folding, type HunkRef } from '../core/layout/folding'
 import { MeasuredHeights } from '../core/layout/measuredHeights'
+import { DEFAULT_RATIO, readRatios, withRatio, writeRatios } from '../core/layout/panes'
+import { PaneDivider } from './PaneDivider'
+import { describePath } from './fileSummary'
 import { moveFrom, startingPosition, type Move } from '../core/layout/navigation'
 import { RowIndex, RowKind, type LayoutMode } from '../core/layout/rowIndex'
 import { Virtualizer, type VisibleWindow } from '../core/layout/virtualizer'
@@ -123,6 +127,65 @@ export function VirtualDiff({
 
   const scrollerRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+
+  /**
+   * How the two columns share the view, per file.
+   *
+   * Per file and not once for the whole diff because the lines in one file
+   * are not the lines in the next, and a width that suits a lockfile does not
+   * suit a header. The cost is that the seam moves as the reader crosses a
+   * file boundary; the gain is that each file can be read at the width it
+   * needs.
+   *
+   * Only what the reader has moved is kept, keyed by path and remembered
+   * across reloads; every other file opens half and half. Moving one file's
+   * divider moves that file's, which is the whole point — a single remembered
+   * width would be written by every drag and would take every untouched file
+   * with it.
+   *
+   * Nothing is re-measured when any of this changes, and nothing needs to be.
+   * A row's height here does not depend on its width: the line rows are
+   * `whitespace-pre` inside a cell that scrolls, and the full-width rows are
+   * `w-max`, which takes the content's own width — so the `flex-wrap` on the
+   * file header has no narrower width to wrap at and never fires. Measured at
+   * a 375px view, where that header is 558px wide and 50px tall, the same
+   * height it has at 1.009px.
+   */
+  const [ratios, setRatios] = useState(readRatios)
+
+  /** By path rather than by index, so a width outlives the diff it was set in
+   *  — the reader is coming back to the same file, not to the same offset. */
+  const pathOfFile = useCallback(
+    (file: number): string => {
+      const found = diff.files[file]
+      return found?.newPath ?? found?.oldPath ?? String(file)
+    },
+    [diff],
+  )
+
+  const ratioOf = useCallback(
+    (file: number): number => ratios.get(pathOfFile(file)) ?? DEFAULT_RATIO,
+    [ratios, pathOfFile],
+  )
+
+  const previewRatio = useCallback(
+    (file: number, next: number): void => {
+      setRatios((current) => withRatio(current, pathOfFile(file), next))
+    },
+    [pathOfFile],
+  )
+
+  const commitRatio = useCallback(
+    (file: number, next: number): void => {
+      setRatios((current) => {
+        const updated = withRatio(current, pathOfFile(file), next)
+        writeRatios(updated)
+        return updated
+      })
+    },
+    [pathOfFile],
+  )
+
   // State rather than a ref, because a fold reads it while deciding where to
   // put the reader back. It changes only when the window does, so the extra
   // render costs nothing, and the scroll handler still never touches layout.
@@ -410,12 +473,47 @@ export function VirtualDiff({
   const activePosition = activeRow === null ? -1 : folding.positionAt(activeRow)
 
   const visibleRows = []
+  /**
+   * Where each file's divider goes, gathered from the same walk that builds
+   * the rows.
+   *
+   * Only over the lines. A file header, a hunk header, a gap and a note are
+   * one column wide — there is nothing there for a divider to divide, and a
+   * rule drawn through them reads as a line that starts before the file does.
+   * So a run breaks at every row that is not a line, which makes "it never
+   * crosses a row that has no seam" true by construction rather than true as
+   * far as anyone has scrolled.
+   *
+   * A file with two hunks on screen therefore has two runs. The first one
+   * carries the control — the label, the value, the tab stop — and the rest
+   * are rules that happen to be draggable, so a reader hears one divider per
+   * file and can still grab whichever piece is under the pointer.
+   *
+   * Clipped to what is on screen on purpose: there are no rows to divide
+   * above or below that, and a run per file on screen beats one per row.
+   */
+  const dividers: { file: number; top: number; height: number; until: number }[] = []
   for (let position = shown.first; position <= shown.last; position += 1) {
     const row = folding.rowAt(position)
     if (row === -1) continue
 
     const hidden = folding.hiddenAfter(position)
     const ref = { file: rows.fileIndexAt(row), hunk: rows.hunkIndexAt(row) }
+
+    if (rows.kindAt(row) === RowKind.Line) {
+      const top = virtualizer.offsetOf(position)
+      const bottom = top + virtualizer.heightOf(position)
+      const last = dividers[dividers.length - 1]
+      // Only when the previous row was the previous line of the same file:
+      // anything else between them is a row with one column, and the run has
+      // to stop before it.
+      if (last?.file === ref.file && last.until === position - 1) {
+        last.height = bottom - last.top
+        last.until = position
+      } else {
+        dividers.push({ file: ref.file, top, height: bottom - top, until: position })
+      }
+    }
 
     // One wrapper per position, and the expander shares it, so the height the
     // virtualizer measures covers both and the arithmetic stays one row deep.
@@ -426,6 +524,10 @@ export function VirtualDiff({
         role="row"
         aria-rowindex={position + 1}
         className={position === activePosition ? ACTIVE_ROW : undefined}
+        // The share this file's columns take, written where a row can inherit
+        // it. A prop would have to pass through every row on screen to reach
+        // a cell that has no other reason to know what the layout is doing.
+        style={{ '--hunk-split': ratioOf(ref.file) } as CSSProperties}
       >
         <Row
           rows={rows}
@@ -480,26 +582,30 @@ export function VirtualDiff({
       {/* Sized for the whole document, so the reader can scroll to rows that
           are not in the DOM yet. */}
       <div role="presentation" style={{ height: shown.totalHeight }} className="relative">
-        {/*
-          The rule between the two columns, drawn once for the whole document.
-
-          It was a `border-r` on every left-hand cell, which is one segment
-          per row of a line that is one device pixel wide — and rows have
-          fractional heights, so the segments landed on different subpixels
-          and the join between them showed. What a reader saw was the border
-          of each row rather than one rule down the view. Nothing measures it
-          and nothing reads it, so it can sit outside the rows entirely.
-        */}
-        {mode === 'split' ? (
-          <div
-            aria-hidden
-            // Above the rows: the block they sit in is transformed, which
-            // makes it a stacking context, and without a z-index of its own
-            // the rule paints under every tinted cell and shows only where a
-            // line is unchanged.
-            className="pointer-events-none absolute inset-y-0 left-1/2 z-20 w-px bg-neutral-800"
-          />
-        ) : null}
+        {mode === 'split'
+          ? dividers.map(({ file, top, height }, at) => (
+              <PaneDivider
+                key={`${file}:${at}`}
+                ratio={ratioOf(file)}
+                // One announced control per file, however many runs of lines
+                // that file has on screen. The rest still drag.
+                label={
+                  dividers.findIndex((run) => run.file === file) === at
+                    ? describePath(diff.files[file]!)
+                    : null
+                }
+                top={top}
+                height={height}
+                scrollerRef={scrollerRef}
+                onPreview={(next) => {
+                  previewRatio(file, next)
+                }}
+                onCommit={(next) => {
+                  commitRatio(file, next)
+                }}
+              />
+            ))
+          : null}
         {/* One transform for the block: rows stay in normal flow, which is
             what lets them be measured. */}
         <div

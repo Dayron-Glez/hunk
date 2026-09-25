@@ -162,14 +162,28 @@ export function SplitDiffRow({
 }
 
 /**
- * Half a row, at half the viewport whatever it holds.
+ * Half a row, or whatever share of it the reader has asked for.
  *
  * A width from the content would make every row's divider land somewhere else,
  * and a width from the widest line in the column would mean measuring lines
  * nobody has scrolled to — the one thing this viewer refuses to do. So the
- * columns are fixed and a long line scrolls inside its own cell. The scrollbar
- * is hidden because a horizontal one is as tall as the row it would sit in.
+ * columns are set from outside and a long line scrolls inside its own cell.
+ * The scrollbar is hidden because a horizontal one is as tall as the row it
+ * would sit in.
+ *
+ * `--hunk-split` is written once, on the grid. A prop would have to pass
+ * through every row on screen to reach a cell that has no other reason to
+ * know what the layout is doing, and would re-render all of them on every
+ * frame of a drag.
  */
+/**
+ * The share of the view each column takes, from the one number the grid
+ * carries. Written with `_` where CSS needs a space, which is how Tailwind
+ * spells an arbitrary value.
+ */
+const OLD_PANE = '[--hunk-pane:calc(var(--hunk-split,0.5)*100%)]'
+const NEW_PANE = '[--hunk-pane:calc((1_-_var(--hunk-split,0.5))*100%)]'
+
 function SplitCell({
   line,
   segments,
@@ -179,11 +193,15 @@ function SplitCell({
   readonly segments: readonly Segment[] | null
   readonly column: 'old' | 'new'
 }) {
+  // The two shares are written as one number on the grid; this is the half
+  // of it each column takes, as a static class rather than a style object
+  // that would be rebuilt for every cell on every frame of a drag.
+  const share = column === 'old' ? OLD_PANE : NEW_PANE
   if (line === null) {
     return (
       <div
         role="gridcell"
-        className="w-1/2 shrink-0 border-l-4 border-l-transparent bg-neutral-900/40"
+        className={`${share} w-(--hunk-pane) shrink-0 border-l-4 border-l-transparent bg-neutral-900/40`}
       >
         <span className="sr-only select-none">
           {column === 'old' ? 'No line here before.' : 'No line here after.'}
@@ -195,7 +213,7 @@ function SplitCell({
   return (
     <div
       role="gridcell"
-      className={`flex w-1/2 shrink-0 ${EDGE_STYLES[line.kind]} ${ROW_STYLES[line.kind]}`}
+      className={`${share} flex w-(--hunk-pane) shrink-0 ${EDGE_STYLES[line.kind]} ${ROW_STYLES[line.kind]}`}
     >
       <span className="sr-only select-none">
         {spokenLabel(line, column === 'old' ? line.oldNumber : line.newNumber)}
