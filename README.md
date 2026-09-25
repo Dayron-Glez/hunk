@@ -3,7 +3,7 @@
 A diff viewer for the files that bring the others down. Paste a GitHub pull request URL, drop
 two files or a `.patch`, and read it.
 
-> **Status: F5 complete — every target is met, with room to spare.**
+> **Status: F6 complete — every target is met, with room to spare.**
 > Variable-height virtualization, syntax highlighting that arrives from a worker without
 > touching first paint, the change inside a line marked word by word in one column or two, the
 > whole thing foldable and readable from the keyboard, and a pull request opened from its link
@@ -99,6 +99,30 @@ still unmeasured rather than met: `bench/README.md` explains why a number from a
 browser there would be a constant wearing a costume. What is measured instead is main-thread
 blocking while scrolling, and it is **zero in all sixteen runs**, with the instrument made to
 prove itself before each of them.
+
+## Scrolling a line that is wider than its column
+
+In two columns each column is scrolled by a bar of its own, at the end of that file's rows.
+A cell clips its line and the line is moved by a transform, so one property moves a whole
+column at once — where before each cell scrolled on its own and moving one long line left
+the line beneath it where it was. The bars are per file, because the columns are: a width
+that suits a lockfile does not suit a header, and neither does a scroll position.
+
+**A bar only knows the widest row of its file that has been rendered, not the widest row it
+has.** This viewer will not measure lines nobody has scrolled to — that is what keeps the
+first paint flat as the diff grows — so it cannot know the second one, and a bar changes
+size as the reader moves down a long file. The same has always been true of the scrollbar in
+the one-column layout; showing one per column makes it visible rather than new. A file
+taller than the view shows no bar until its end comes up, and is panned with the arrow keys
+or a sideways wheel until then.
+
+**The grid itself no longer scrolls sideways in two columns.** A row that spans both — a file
+header, a hunk header, a gap — takes the width of the view there rather than of its content,
+so a long path wraps onto a second line instead of running off the edge. Left to overflow it
+gave the grid a horizontal scrollbar of its own across the bottom, which scrolled neither
+column and held itself up: the bar takes eleven pixels of height, the usable width shrinks
+with it, the content then fits, and `scrollWidth > clientWidth` reports false while the bar
+is still drawn. One column keeps its own bar, where the grid really is what scrolls.
 
 ## Reading it without a mouse, or without the screen
 
