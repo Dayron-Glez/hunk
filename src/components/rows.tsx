@@ -38,7 +38,7 @@ export function FileHeaderRow({
          the air: the virtualizer measures with getBoundingClientRect, which
          does not count margins, so a margin here would put every row below
          this one out by its height. */
-      className="flex w-max min-w-full flex-wrap items-center gap-x-3 gap-y-1 border-t-2 border-b border-t-neutral-600 border-b-neutral-800 bg-neutral-900 px-3 pt-4 pb-3"
+      className="flex w-(--hunk-row,max-content) min-w-full flex-wrap items-center gap-x-3 gap-y-1 border-t-2 border-b border-t-neutral-600 border-b-neutral-800 bg-neutral-900 px-3 pt-4 pb-3"
     >
       <Chevron collapsed={collapsed} onToggle={onToggle} label={describePath(file)} />
       <span
@@ -81,7 +81,7 @@ export function HunkHeaderRow({
   return (
     <div
       role="gridcell"
-      className="flex w-max min-w-full items-center gap-2 bg-sky-500/10 px-3 py-1 font-mono text-xs text-sky-300/70"
+      className="flex w-(--hunk-row,max-content) min-w-full items-center gap-2 bg-sky-500/10 px-3 py-1 font-mono text-xs text-sky-300/70"
     >
       <Chevron collapsed={collapsed} onToggle={onToggle} label={range} />
       <span className="cursor-help select-none" data-hint={explains}>
@@ -94,7 +94,10 @@ export function HunkHeaderRow({
 
 export function NoteRow({ file }: { readonly file: DiffFile }) {
   return (
-    <p role="gridcell" className="w-max min-w-full px-3 py-4 text-sm text-neutral-500">
+    <p
+      role="gridcell"
+      className="w-(--hunk-row,max-content) min-w-full px-3 py-4 text-sm text-neutral-500"
+    >
       {describeEmptyBody(file)}
     </p>
   )
@@ -171,7 +174,7 @@ export function ExpanderRow({
   return (
     <div
       role="gridcell"
-      className="flex w-max min-w-full items-center gap-3 border-y border-neutral-800 bg-neutral-900/60 px-3 py-1.5 text-xs"
+      className="flex w-(--hunk-row,max-content) min-w-full items-center gap-3 border-y border-neutral-800 bg-neutral-900/60 px-3 py-1.5 text-xs"
     >
       <button
         type="button"
@@ -236,7 +239,7 @@ export function GapRow({
   return (
     <div
       role="gridcell"
-      className="flex w-max min-w-full items-center gap-2 border-y border-neutral-800 bg-sky-500/5 px-3 py-1.5 text-xs"
+      className="flex w-(--hunk-row,max-content) min-w-full items-center gap-2 border-y border-neutral-800 bg-sky-500/5 px-3 py-1.5 text-xs"
     >
       {failed ? (
         <span role="alert" className="text-amber-200/90">

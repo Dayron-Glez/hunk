@@ -48,6 +48,19 @@ export function nudgeRatio(ratio: number, steps: number): number {
   return clampRatio(clampRatio(ratio) + steps * RATIO_STEP)
 }
 
+/**
+ * How far a column may be panned sideways: never past its own content.
+ *
+ * `content` is the widest row of that file that has been rendered, which is
+ * not its widest row — this viewer will not measure lines nobody has
+ * scrolled to. So the limit grows as the reader moves down, and a column
+ * whose content fits cannot be panned at all.
+ */
+export function clampPan(to: number, content: number, pane: number): number {
+  if (!Number.isFinite(to)) return 0
+  return Math.min(Math.max(0, content - pane), Math.max(0, to))
+}
+
 /** What a screen reader announces, and what the separator carries. */
 export function ratioAsPercent(ratio: number): number {
   return Math.round(clampRatio(ratio) * 100)

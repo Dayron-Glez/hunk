@@ -4,6 +4,7 @@ import {
   MAX_RATIO,
   MIN_RATIO,
   RATIO_STEP,
+  clampPan,
   clampRatio,
   nudgeRatio,
   ratioAsPercent,
@@ -69,6 +70,38 @@ describe('nudging it by keyboard', () => {
     expect(ratioAsPercent(0.5)).toBe(50)
     expect(ratioAsPercent(0.333)).toBe(33)
     expect(ratioAsPercent(2)).toBe(ratioAsPercent(MAX_RATIO))
+  })
+})
+
+/**
+ * Panning a column sideways. What a pointer does with it is not testable
+ * here — jsdom has no layout, so every width it reports is zero — so what is
+ * tested is the limit the pointer is held to.
+ */
+describe('how far a column may be panned', () => {
+  it('stops at the end of the content rather than past it', () => {
+    expect(clampPan(500, 900, 400)).toBe(500)
+    expect(clampPan(900, 900, 400)).toBe(500)
+  })
+
+  it('does not move a column whose content already fits', () => {
+    expect(clampPan(300, 400, 400)).toBe(0)
+    expect(clampPan(300, 100, 400)).toBe(0)
+  })
+
+  it('does not go left of the start', () => {
+    expect(clampPan(-200, 900, 400)).toBe(0)
+  })
+
+  /** The width is the widest row rendered so far, so the limit grows as the
+   *  reader moves down and a pan is never larger than what has been seen. */
+  it('grows with what has been measured', () => {
+    expect(clampPan(700, 600, 400)).toBe(200)
+    expect(clampPan(700, 1_200, 400)).toBe(700)
+  })
+
+  it.each([NaN, Infinity])('refuses %s rather than moving by it', (bad) => {
+    expect(clampPan(bad, 900, 400)).toBe(0)
   })
 })
 

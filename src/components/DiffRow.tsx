@@ -167,22 +167,26 @@ export function SplitDiffRow({
  * A width from the content would make every row's divider land somewhere else,
  * and a width from the widest line in the column would mean measuring lines
  * nobody has scrolled to — the one thing this viewer refuses to do. So the
- * columns are set from outside and a long line scrolls inside its own cell.
- * The scrollbar is hidden because a horizontal one is as tall as the row it
- * would sit in.
+ * columns are set from outside and a long line is clipped by its cell, then
+ * moved as part of its whole column by the bar in that file's header.
  *
- * `--hunk-split` is written once, on the grid. A prop would have to pass
+ * It used to scroll inside its own cell, which made scrolling a per-row
+ * affair: moving one long line left the line beneath it where it was.
+ *
+ * Both properties are written once, on the row. A prop would have to pass
  * through every row on screen to reach a cell that has no other reason to
  * know what the layout is doing, and would re-render all of them on every
  * frame of a drag.
  */
 /**
- * The share of the view each column takes, from the one number the grid
- * carries. Written with `_` where CSS needs a space, which is how Tailwind
- * spells an arbitrary value.
+ * What each column takes from the two numbers a row carries: its share of the
+ * width, and how far it has been panned. Written with `_` where CSS needs a
+ * space, which is how Tailwind spells an arbitrary value.
  */
-const OLD_PANE = '[--hunk-pane:calc(var(--hunk-split,0.5)*100%)]'
-const NEW_PANE = '[--hunk-pane:calc((1_-_var(--hunk-split,0.5))*100%)]'
+const OLD_PANE =
+  '[--hunk-pane:calc(var(--hunk-split,0.5)*100%)] [--hunk-shift:var(--hunk-pan-old,0px)]'
+const NEW_PANE =
+  '[--hunk-pane:calc((1_-_var(--hunk-split,0.5))*100%)] [--hunk-shift:var(--hunk-pan-new,0px)]'
 
 function SplitCell({
   line,
@@ -230,20 +234,31 @@ function SplitCell({
       >
         {MARKERS[line.kind]}
       </span>
-      {/* Chrome makes a scrollable box a tab stop so it can be scrolled by
-          keyboard. Here that would put a stop on every long line on screen, in
-          a list that rearranges itself as it scrolls — 18 of them in 37 rows on
-          a real diff. The grid is the one stop, and its left and right arrows
-          pan this instead. */}
-      <span
-        tabIndex={-1}
-        data-pan
-        className="min-w-0 flex-1 [scrollbar-width:none] overflow-x-auto whitespace-pre text-neutral-200 outline-none [&::-webkit-scrollbar]:hidden"
-      >
-        <LineContent line={line} segments={segments} />
-        {line.noNewlineAtEof ? (
-          <span className="pl-4 text-neutral-500 italic select-none">no newline</span>
-        ) : null}
+      {/*
+        Moved rather than scrolled. A scrollable box is a tab stop in Chrome,
+        which put one on every long line on screen — 18 in 37 rows on a real
+        diff, in a list that rearranges itself as it scrolls — and scrolling
+        each cell made panning a per-row affair.
+
+        Two elements, because one cannot both clip and be measured. The outer
+        one is the window: it stays where the flex row puts it and cuts the
+        line off at its own left edge, which is what keeps a panned line from
+        painting over the number and the marker, both of which come earlier in
+        the row and so paint underneath. The inner one is the line at its full
+        width, which is the width the bar has to report — and a transform does
+        not change a layout width, so reading it costs one `offsetWidth` in
+        the pass that already measures these rows.
+      */}
+      <span className="min-w-0 flex-1 overflow-hidden">
+        <span
+          data-col={column}
+          className="block w-max translate-x-[calc(var(--hunk-shift,0px)*-1)] whitespace-pre text-neutral-200"
+        >
+          <LineContent line={line} segments={segments} />
+          {line.noNewlineAtEof ? (
+            <span className="pl-4 text-neutral-500 italic select-none">no newline</span>
+          ) : null}
+        </span>
       </span>
     </div>
   )

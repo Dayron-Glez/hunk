@@ -829,34 +829,47 @@ describe('reading it without seeing it', () => {
 describe('long lines in two columns', () => {
   const grid = (): HTMLElement => screen.getByRole('grid')
 
-  const panes = (): HTMLElement[] => Array.from(list().querySelectorAll<HTMLElement>('[data-pan]'))
+  const cells = (): HTMLElement[] => Array.from(list().querySelectorAll<HTMLElement>('[data-col]'))
 
-  it('keeps the scrollable cells out of the tab order', () => {
+  const openSplit = (): void => {
     globalThis.testViewportHeight = 100_000
     render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+  }
 
-    expect(panes().length).toBeGreaterThan(10)
-    for (const pane of panes()) expect(pane).toHaveAttribute('tabindex', '-1')
+  /** A scrollable box is a tab stop in Chrome, which put one on every long
+   *  line on screen. Nothing inside a row scrolls any more. */
+  it('leaves no scrollable box inside a row', () => {
+    openSplit()
+    expect(cells().length).toBeGreaterThan(10)
+    for (const cell of cells()) {
+      expect(cell.className).not.toContain('overflow-x-auto')
+      expect(cell).not.toHaveAttribute('tabindex')
+    }
   })
 
-  it('pans the row the reader is on with left and right', () => {
-    globalThis.testViewportHeight = 100_000
-    render(<VirtualDiff diff={diffOf('vite-pr-23346-normal.diff')} mode="split" />)
+  /** Every file carries its own pair, inside its own header row, so nothing
+   *  floats over a line and a file's offset is its own. */
+  it('gives every file on screen a pair of bars in its header', () => {
+    openSplit()
+    const headers = document.querySelectorAll('[data-bars]')
+    expect(headers.length).toBeGreaterThan(1)
+    for (const found of headers) expect(found.querySelectorAll('[data-bar]')).toHaveLength(2)
+  })
 
+  /**
+   * That the arrows are the divider's and not the browser's. How far they
+   * move a column is held to the content's width, and jsdom reports every
+   * width as zero — so the limit is tested in `core/layout/panes` and the
+   * movement itself only in a browser.
+   */
+  it('takes the arrows in two columns, where nothing scrolls on its own', () => {
+    openSplit()
     fireEvent.keyDown(grid(), { key: 'Home' })
     fireEvent.keyDown(grid(), { key: 'j' })
-    fireEvent.keyDown(grid(), { key: 'j' })
 
-    const id = grid().getAttribute('aria-activedescendant')!
-    const row = document.getElementById(id)!
-    const pane = row.querySelector<HTMLElement>('[data-pan]')!
-    expect(pane.scrollLeft).toBe(0)
-
-    fireEvent.keyDown(grid(), { key: 'ArrowRight' })
-    expect(pane.scrollLeft).toBeGreaterThan(0)
-
-    fireEvent.keyDown(grid(), { key: 'ArrowLeft' })
-    expect(pane.scrollLeft).toBe(0)
+    const event = createEvent.keyDown(grid(), { key: 'ArrowRight' })
+    fireEvent(grid(), event)
+    expect(event.defaultPrevented).toBe(true)
   })
 
   it('leaves the arrows to the browser in one column, where the grid scrolls', () => {
